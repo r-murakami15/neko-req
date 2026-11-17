@@ -87,3 +87,78 @@ export function buildTree({ ops, adhocs, adhocLoaded, query, expanded }: TreeInp
   }
   return rows;
 }
+
+/** 前面のタブの行が、ツリーのどこにあるか。 */
+export interface RowLocation {
+  /**
+   * `ok` = ツリーに出せる。`hidden` = データにはあるが、検索に当たっていない。
+   * `missing` = データにない（取り込みや読み込みがまだ・消えた）。
+   */
+  status: "ok" | "hidden" | "missing";
+  /** 入っているフォルダの `id`（フォルダに入らない並びのときは `null`）。`ok` のときだけ。 */
+  folderId: string | null;
+}
+
+/** 行のキー（`TreeRow.key`）から、その行が入るフォルダと、いま検索で見えるかを調べる。`buildTree` の並べ方と合わせる。 */
+export function locateRow(key: string, { ops, adhocs, query }: { ops: OperationListItem[]; adhocs: AdHocRequest[]; query: string }): RowLocation {
+  const missing: RowLocation = { status: "missing", folderId: null };
+  if (key.startsWith("adhoc:")) {
+    const found = adhocs.find((a) => `adhoc:${a.id}` === key);
+    if (!found) return missing;
+    return matchesAdhoc(found, query) ? { status: "ok", folderId: "adhoc" } : { status: "hidden", folderId: null };
+  }
+  const item = ops.find((o) => `op:${opKeyString(o.opKey)}` === key);
+  if (!item) return missing;
+  if (!matchesOp(item, query)) return { status: "hidden", folderId: null };
+  if (item.deleted) return { status: "ok", folderId: "deleted" };
+  const hasFolders = ops.some((o) => !o.deleted && o.folder !== null);
+  return { status: "ok", folderId: hasFolders ? `tag:${item.folder ?? ""}` : null };
+}
+
+/** WAI-ARIA の tree 用の、行ごとの位置（`aria-level`・`aria-setsize`・`aria-posinset`）と親の行。案内の行（`hint`）は項目ではない。 */
+export interface TreeMeta {
+  /** 1 = いちばん上（フォルダ・フォルダに入らない API）、2 = フォルダの中。案内の行は 0。 */
+  level: number;
+  setSize: number;
+  posInSet: number;
+  /** 親のフォルダの行の番号。いちばん上は -1。 */
+  parent: number;
+}
+
+/** キーボードで移れる行（案内の行を除く）か。 */
+export const isNavigable = (row: TreeRow | undefined): boolean => row !== undefined && row.type !== "hint";
+
+export function treeMeta(rows: TreeRow[]): TreeMeta[] {
+  const meta: TreeMeta[] = rows.map(() => ({ level: 0, setSize: 0, posInSet: 0, parent: -1 }));
+  const groups = new Map<number, number[]>();
+  const add = (parent: number, index: number) => {
+    const list = groups.get(parent);
+    if (list) list.push(index);
+    else groups.set(parent, [index]);
+  };
+  let folder = -1;
+  rows.forEach((row, i) => {
+    const m = meta[i];
+    if (!m || row.type === "hint") return;
+    if (row.type === "folder") {
+      folder = i;
+      m.level = 1;
+      add(-1, i);
+      return;
+    }
+    // フォルダが 1 つもないとき、API は先頭からフォルダに入らずに並ぶ
+    m.level = folder === -1 ? 1 : 2;
+    m.parent = folder;
+    add(folder, i);
+  });
+  for (const list of groups.values()) {
+    list.forEach((i, n) => {
+      const m = meta[i];
+      if (m) {
+        m.setSize = list.length;
+        m.posInSet = n + 1;
+      }
+    });
+  }
+  return meta;
+}

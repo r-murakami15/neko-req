@@ -33,14 +33,14 @@ export const sidebar = () => screen.getByRole("navigation", { name: "API ツリ�
 
 /** タグのフォルダを開く（開いていれば何もしない）。 */
 export async function openFolder(user: UserEvent, name: string) {
-  const folder = await within(sidebar()).findByRole("button", { name: new RegExp(`^${name}\\s`) });
+  const folder = await within(sidebar()).findByRole("treeitem", { name: new RegExp(`^${name}\\s`) });
   if (folder.getAttribute("aria-expanded") !== "true") await user.click(folder);
 }
 
 /** ツリーから API を開く。 */
 export async function openOp(user: UserEvent, folder: string, name: RegExp | string) {
   await openFolder(user, folder);
-  await user.click(await within(sidebar()).findByRole("button", { name }));
+  await user.click(await within(sidebar()).findByRole("treeitem", { name }));
 }
 
 export const requestRegion = () => screen.getByRole("region", { name: "リクエスト" });

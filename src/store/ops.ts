@@ -2,6 +2,7 @@ import type { Backend } from "../api/backend";
 import type { HistoryOpen, OpKey } from "../bindings";
 import { emptySpec, NEW_REQUEST_NAME, suggestName } from "../lib/spec";
 import { opInfoOf, opTabName, useTabsStore } from "./tabs";
+import { useUiStore } from "./ui";
 
 /**
  * yaml の API を開く。同じ API のタブが開いていればそのタブを前に出し、なければ `operation_open` で初期値を作って
@@ -36,4 +37,11 @@ export async function openFromHistory(backend: Backend, projectId: string, h: Hi
   }
   const name = h.summary ?? (suggestName(h.request) || NEW_REQUEST_NAME);
   return tabs.openSeed(projectId, { name, spec: h.request, baseName: NEW_REQUEST_NAME, baseSpec: emptySpec(), droppedNote });
+}
+
+/** 空の HTTP リクエストを新しいタブですぐ開き、URL 欄にフォーカスを入れる（タブの「＋」・Cmd/Ctrl+T）。 */
+export function openBlankTab(projectId: string): string {
+  const id = useTabsStore.getState().openNew(projectId);
+  useUiStore.getState().setFocusUrlTabId(id);
+  return id;
 }

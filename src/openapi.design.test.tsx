@@ -165,7 +165,6 @@ describe("設計タブ", () => {
   it("yaml の API ではないタブには設計がない（取り込んでいないプロジェクトでも）", async () => {
     const { user } = await setupWithApi();
     await user.click(screen.getByRole("button", { name: "新しいタブ" }));
-    await user.click(await screen.findByRole("button", { name: /HTTP リクエスト/ }));
     await user.click(await screen.findByRole("tab", { name: "設計" }));
     expect(screen.getByText(/OpenAPI の API ではないので、設計はありません/)).toBeInTheDocument();
   });
@@ -220,7 +219,7 @@ describe("yaml の API のタブ（M2 の画面への追加）", () => {
 
     // 閉じて開き直しても、保存した入力値が戻る
     await user.click(screen.getByRole("button", { name: "取引先一覧取得 を閉じる" }));
-    await user.click(await within(sidebar()).findByRole("button", { name: /取引先一覧取得/ }));
+    await user.click(await within(sidebar()).findByRole("treeitem", { name: /取引先一覧取得/ }));
     expect(await screen.findByRole("checkbox", { name: "クエリパラメータ 4 行目を有効にする" })).toBeChecked();
     expect(within(screen.getByRole("tab", { name: /取引先一覧取得/ })).queryByRole("img", { name: "未保存" })).not.toBeInTheDocument();
   });
@@ -296,7 +295,6 @@ describe("yaml の API のタブ（M2 の画面への追加）", () => {
 
     // yaml の API ではないタブには、このボタンはない
     await user.click(screen.getByRole("button", { name: "新しいタブ" }));
-    await user.click(await screen.findByRole("button", { name: /HTTP リクエスト/ }));
     await user.click(await screen.findByRole("tab", { name: "ボディ" }));
     await user.click(screen.getByRole("radio", { name: "JSON" }));
     expect(screen.queryByRole("button", { name: "スキーマから例を生成" })).not.toBeInTheDocument();

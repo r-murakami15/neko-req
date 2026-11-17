@@ -41,7 +41,7 @@ export function CreateProjectForm({
           setName(e.target.value);
           if (create.isError) create.reset();
         }}
-        placeholder="例: 日本アニメーション ライセンス契約管理システム API"
+        placeholder="例: サンプル書店 API"
         autoComplete="off"
         autoFocus={autoFocus}
         aria-invalid={create.isError}

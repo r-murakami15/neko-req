@@ -170,3 +170,11 @@ export const UploadIcon = () => (
     <path d="M5 20h14" />
   </Svg>
 );
+
+/** 右側の欄（レスポンス）を表す。開閉のボタンに使う。 */
+export const PanelRightIcon = () => (
+  <Svg width="15" height="15">
+    <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
+    <path d="M14.5 4.5v15" />
+  </Svg>
+);

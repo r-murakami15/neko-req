@@ -2,6 +2,7 @@ import type { Backend } from "../api/backend";
 import { errorMessage } from "../api";
 import type { RequestFinished, RequestInput, SendOutcome } from "../bindings";
 import { IDLE_SEND, isDirty, useTabsStore } from "./tabs";
+import { useUiStore } from "./ui";
 
 /**
  * 送信の流れ。
@@ -26,6 +27,9 @@ export function onSendFinished(hook: (event: RequestFinished) => void): () => vo
 const MAX_EARLY = 4;
 
 function finish(tabId: string, outcome: SendOutcome, event?: RequestFinished) {
+  // レスポンス欄を閉じているときは開かず、「レスポンスを表示」に新しい結果がある印を付ける
+  const ui = useUiStore.getState();
+  if (!ui.responseOpen) ui.markResponseUnseen(tabId);
   useTabsStore.getState().setSend(tabId, (s) => ({
     ...s,
     phase: "finished",

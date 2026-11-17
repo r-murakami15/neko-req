@@ -25,7 +25,6 @@ async function setup({ delay = 20, withEnv = true }: { delay?: number; withEnv?:
 
 async function openNewRequest(user: UserEvent) {
   await user.click(screen.getByRole("button", { name: "新しいタブ" }));
-  await user.click(await screen.findByRole("button", { name: /HTTP リクエスト/ }));
   await screen.findByRole("region", { name: "リクエスト" });
 }
 
@@ -510,7 +509,7 @@ describe("保存と「その他」", () => {
 
   it("プロジェクトのカードは既存の作成ダイアログを開く", async () => {
     const { user } = await setup();
-    await user.click(screen.getByRole("button", { name: "新しいタブ" }));
+    await user.click(within(screen.getByRole("navigation", { name: "API ツリー" })).getByRole("button", { name: "新規作成" }));
     await user.click(await screen.findByRole("button", { name: /^プロジェクト/ }));
     expect(await screen.findByRole("dialog", { name: "新しいプロジェクト" })).toBeInTheDocument();
   });

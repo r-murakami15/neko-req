@@ -30,6 +30,9 @@ export function renderApp(backend: Backend = createMockBackend()) {
     importDialogOpen: false,
     syncDialogOpen: false,
     settingsDialogOpen: false,
+    responseOpen: true,
+    unseenResponses: {},
+    focusUrlTabId: null,
   });
   useTabsStore.getState().reset();
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });

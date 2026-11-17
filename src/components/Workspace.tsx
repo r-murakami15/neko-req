@@ -41,10 +41,7 @@ export function Workspace({ project }: { project: Project }) {
       )}
 
       <footer className="statusbar">
-        <span title={appInfo.data?.dbPath}>保存先: {appInfo.data?.dbPath ?? "…"}</span>
-        <span className="statusbar-right">
-          {project.source ? `OpenAPI ${project.source.openapiVersion} から取り込み（${project.source.entry}）` : "OpenAPI は未取り込み"}
-        </span>
+        <span className="statusbar-right">{appInfo.data ? `${appInfo.data.name} v${appInfo.data.version}` : ""}</span>
       </footer>
 
       <NewRequestDialog projectId={project.id} />

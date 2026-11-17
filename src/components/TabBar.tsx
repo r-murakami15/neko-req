@@ -1,15 +1,14 @@
 import { useBackend } from "../api";
 import { methodColor } from "../lib/spec";
+import { openBlankTab } from "../store/ops";
 import { closeTab } from "../store/send";
 import { isDirty, type RequestTab, useTabsStore } from "../store/tabs";
-import { useUiStore } from "../store/ui";
 import { CloseIcon } from "./Icons";
 
 /** 開いているリクエストのタブ列。 */
 export function TabBar({ projectId, tabs, activeId }: { projectId: string; tabs: RequestTab[]; activeId: string | undefined }) {
   const backend = useBackend();
   const activate = useTabsStore((s) => s.activate);
-  const setNewRequestDialogOpen = useUiStore((s) => s.setNewRequestDialogOpen);
 
   return (
     <div className="tabbar" role="tablist" aria-label="開いているリクエスト">
@@ -32,7 +31,7 @@ export function TabBar({ projectId, tabs, activeId }: { projectId: string; tabs:
           </button>
         </div>
       ))}
-      <button type="button" className="tab-add" aria-label="新しいタブ" onClick={() => setNewRequestDialogOpen(true)}>
+      <button type="button" className="tab-add" aria-label="新しいタブ" title="空のリクエストを新しいタブで開く" onClick={() => openBlankTab(projectId)}>
         +
       </button>
     </div>

@@ -61,21 +61,21 @@ describe("API ツリー", () => {
     expect(await nav.findByText("11 件 · タグ 4")).toBeInTheDocument();
 
     // 最初のタグ（auth）だけ開いている
-    const auth = nav.getByRole("button", { name: /^auth\s/ });
+    const auth = nav.getByRole("treeitem", { name: /^auth\s/ });
     expect(auth).toHaveAttribute("aria-expanded", "true");
     expect(auth).toHaveTextContent("4");
-    expect(nav.getByRole("button", { name: /ログイン状態取得/ })).toBeInTheDocument();
-    const clientFolder = nav.getByRole("button", { name: /^video-client\s/ });
+    expect(nav.getByRole("treeitem", { name: /ログイン状態取得/ })).toBeInTheDocument();
+    const clientFolder = nav.getByRole("treeitem", { name: /^video-client\s/ });
     expect(clientFolder).toHaveAttribute("aria-expanded", "false");
-    expect(nav.queryByRole("button", { name: /取引先一覧取得/ })).not.toBeInTheDocument();
+    expect(nav.queryByRole("treeitem", { name: /取引先一覧取得/ })).not.toBeInTheDocument();
     // タグなしの API は「（タグなし）」に入る
-    expect(nav.getByRole("button", { name: /^（タグなし）\s/ })).toBeInTheDocument();
+    expect(nav.getByRole("treeitem", { name: /^（タグなし）\s/ })).toBeInTheDocument();
 
     await user.click(clientFolder);
     expect(clientFolder).toHaveAttribute("aria-expanded", "true");
-    const list = nav.getByRole("button", { name: /取引先一覧取得/ });
+    const list = nav.getByRole("treeitem", { name: /取引先一覧取得/ });
     expect(within(list).getByText("GET")).toHaveStyle({ color: "var(--method-get)" });
-    expect(within(nav.getByRole("button", { name: /取引先登録/ })).getByText("POST")).toHaveStyle({ color: "var(--method-post)" });
+    expect(within(nav.getByRole("treeitem", { name: /取引先登録/ })).getByText("POST")).toHaveStyle({ color: "var(--method-post)" });
 
     // クリックでタブに開く。URL は {{baseUrl}}/path
     await user.click(list);
@@ -85,11 +85,11 @@ describe("API ツリー", () => {
     await waitFor(() => expect(screen.getByRole("status", { name: "展開後の URL" })).toHaveTextContent("http://localhost:8080/api/v1/video/clients"));
 
     // 別の API を開いてから、もう一度クリックすると、新しいタブは作らず元のタブに戻る
-    await user.click(nav.getByRole("button", { name: /取引先登録/ }));
+    await user.click(nav.getByRole("treeitem", { name: /取引先登録/ }));
     expect(await screen.findByRole("tab", { name: /取引先登録/ })).toHaveAttribute("aria-selected", "true");
     expect(screen.getAllByRole("tab", { name: /^(GET|POST) / }).length).toBeGreaterThanOrEqual(2);
     const before = screen.getAllByRole("tablist", { name: "開いているリクエスト" })[0].querySelectorAll('[role="tab"]').length;
-    await user.click(nav.getByRole("button", { name: /取引先一覧取得/ }));
+    await user.click(nav.getByRole("treeitem", { name: /取引先一覧取得/ }));
     await waitFor(() => expect(screen.getByRole("tab", { name: /取引先一覧取得/ })).toHaveAttribute("aria-selected", "true"));
     expect(screen.getByRole("tablist", { name: "開いているリクエスト" }).querySelectorAll('[role="tab"]')).toHaveLength(before);
   });
@@ -100,19 +100,19 @@ describe("API ツリー", () => {
     const search = nav.getByLabelText("API を検索");
 
     await user.type(search, "取引先");
-    expect(await nav.findByRole("button", { name: /取引先一覧取得/ })).toBeInTheDocument();
-    expect(nav.getByRole("button", { name: /取引先登録/ })).toBeInTheDocument();
-    expect(nav.queryByRole("button", { name: /ログイン状態取得/ })).not.toBeInTheDocument();
+    expect(await nav.findByRole("treeitem", { name: /取引先一覧取得/ })).toBeInTheDocument();
+    expect(nav.getByRole("treeitem", { name: /取引先登録/ })).toBeInTheDocument();
+    expect(nav.queryByRole("treeitem", { name: /ログイン状態取得/ })).not.toBeInTheDocument();
     expect(nav.getByText("検索: 3 件")).toBeInTheDocument();
 
     await user.clear(search);
     await user.type(search, "createPasswordLogin");
-    expect(await nav.findByRole("button", { name: /パスワードログイン/ })).toBeInTheDocument();
-    expect(nav.queryByRole("button", { name: /取引先一覧取得/ })).not.toBeInTheDocument();
+    expect(await nav.findByRole("treeitem", { name: /パスワードログイン/ })).toBeInTheDocument();
+    expect(nav.queryByRole("treeitem", { name: /取引先一覧取得/ })).not.toBeInTheDocument();
 
     await user.clear(search);
     await user.type(search, "/works/");
-    expect(await nav.findByRole("button", { name: /作品取得/ })).toBeInTheDocument();
+    expect(await nav.findByRole("treeitem", { name: /作品取得/ })).toBeInTheDocument();
 
     await user.clear(search);
     await user.type(search, "zzzz");
@@ -166,9 +166,9 @@ describe("削除された API", () => {
     await user.click(footerButton(dialog, "閉じる"));
 
     const nav = within(sidebar());
-    const gone = await nav.findByRole("button", { name: /^削除された API\s/ });
+    const gone = await nav.findByRole("treeitem", { name: /^削除された API\s/ });
     await user.click(gone);
-    expect(await nav.findByRole("button", { name: /旧ヘルスチェック$/ })).toBeInTheDocument();
+    expect(await nav.findByRole("treeitem", { name: /旧ヘルスチェック$/ })).toBeInTheDocument();
     // 開いていたタブには「yaml から削除」の知らせが出る
     expect(await screen.findByText(/この API は yaml から削除されました/, { selector: ".alert" })).toBeInTheDocument();
 
@@ -176,7 +176,7 @@ describe("削除された API", () => {
     const confirm = await screen.findByRole("dialog", { name: "削除された API を消しますか？" });
     expect(confirm).toHaveTextContent("入力値も一緒に消えます");
     await user.click(within(confirm).getByRole("button", { name: "消す" }));
-    await waitFor(() => expect(nav.queryByRole("button", { name: /^削除された API\s/ })).not.toBeInTheDocument());
+    await waitFor(() => expect(nav.queryByRole("treeitem", { name: /^削除された API\s/ })).not.toBeInTheDocument());
     expect(screen.queryByRole("tab", { name: /旧ヘルスチェック/ })).not.toBeInTheDocument();
     expect(await mock.draftGet(project.id, { kind: "id", value: "legacyPing" })).toBeNull();
   });
@@ -225,8 +225,8 @@ describe("同期", () => {
     // ツリーが取り直され、印が消える
     expect(await within(sidebar()).findByText("11 件 · タグ 3")).toBeInTheDocument();
     await openFolder(user, "video-client");
-    expect(await within(sidebar()).findByRole("button", { name: /取引先詳細取得/ })).toBeInTheDocument();
-    expect(within(sidebar()).queryByRole("button", { name: /^legacy\s/ })).not.toBeInTheDocument();
+    expect(await within(sidebar()).findByRole("treeitem", { name: /取引先詳細取得/ })).toBeInTheDocument();
+    expect(within(sidebar()).queryByRole("treeitem", { name: /^legacy\s/ })).not.toBeInTheDocument();
     await waitFor(() => expect(within(syncButton()).queryByRole("img", { name: "変更あり" })).not.toBeInTheDocument());
   });
 

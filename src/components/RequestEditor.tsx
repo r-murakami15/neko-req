@@ -11,8 +11,9 @@ import { describeLocation, indexUnresolved, type Section, splitVars } from "../l
 import { useActionsStore } from "../store/actions";
 import { cancelTab, sendTab } from "../store/send";
 import { type RequestPane, type RequestTab, useTabsStore } from "../store/tabs";
+import { useUiStore } from "../store/ui";
 import { ConfirmDialog } from "./Dialog";
-import { ArrowRightIcon, ChevronDownIcon } from "./Icons";
+import { ArrowRightIcon, ChevronDownIcon, PanelRightIcon } from "./Icons";
 import { AuthPanel, type AuthKind, defaultAuth } from "./AuthPanel";
 import { BodyPanel, defaultBody } from "./BodyPanel";
 import { DesignPanel } from "./DesignPanel";
@@ -34,6 +35,10 @@ export function RequestEditor({ project, tab }: { project: Project; tab: Request
   const [curlMessage, setCurlMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [rawConfirmOpen, setRawConfirmOpen] = useState(false);
   const dismissDropped = useTabsStore((s) => s.dismissDropped);
+  const responseOpen = useUiStore((s) => s.responseOpen);
+  const setResponseOpen = useUiStore((s) => s.setResponseOpen);
+  const unseen = useUiStore((s) => s.unseenResponses[tab.id] === true);
+  const urlField = useRef<HTMLDivElement>(null);
 
   const op = tab.op;
   const opKey = op?.opKey ?? null;
@@ -107,6 +112,14 @@ export function RequestEditor({ project, tab }: { project: Project; tab: Request
     return () => setEditorActions(null);
   }, [tab.id, setEditorActions]);
 
+  // 「＋」・Cmd/Ctrl+T で開いたばかりのタブは、URL 欄にフォーカスを入れる
+  useEffect(() => {
+    const ui = useUiStore.getState();
+    if (ui.focusUrlTabId !== tab.id) return;
+    ui.setFocusUrlTabId(null);
+    urlField.current?.querySelector("input")?.focus();
+  }, [tab.id]);
+
   const onBodyKind = (kind: Body["kind"]) => {
     const current = tab.spec.body;
     const stash = { ...tab.bodyStash, [current.kind]: current };
@@ -137,6 +150,12 @@ export function RequestEditor({ project, tab }: { project: Project; tab: Request
 
   // yaml の API の設計タブは、画面イメージのとおり幅いっぱいに読ませる（レスポンス欄は隠す）
   const designFull = op !== null && tab.requestPane === "design";
+  const showResponse = responseOpen && !designFull;
+
+  // レスポンス欄が見えているタブの「新しい結果」の印は外す
+  useEffect(() => {
+    if (showResponse && unseen) useUiStore.getState().clearResponseUnseen(tab.id);
+  }, [showResponse, unseen, tab.id]);
   const urlBad = unresolved.url.size > 0;
   const showUrlError = preview?.urlError && tab.spec.url.trim() !== "";
 
@@ -144,7 +163,7 @@ export function RequestEditor({ project, tab }: { project: Project; tab: Request
     <>
       <div className="urlbar">
         <div className="urlbar-row">
-          <div className={`url-field${urlBad ? " is-invalid" : ""}`}>
+          <div className={`url-field${urlBad ? " is-invalid" : ""}`} ref={urlField}>
             <select
               className="method-select"
               aria-label="HTTPメソッド"
@@ -297,7 +316,7 @@ export function RequestEditor({ project, tab }: { project: Project; tab: Request
         }}
       />
 
-      <div className={`panes${designFull ? " is-design" : ""}`}>
+      <div className={`panes${designFull ? " is-design" : ""}${!responseOpen && !designFull ? " is-response-closed" : ""}`}>
         <section className="pane pane-request" aria-label="リクエスト">
           <div className="pane-tabs" role="tablist" aria-label="リクエスト設定">
             {tabs.map((t) => (
@@ -317,6 +336,18 @@ export function RequestEditor({ project, tab }: { project: Project; tab: Request
                 )}
               </button>
             ))}
+            {!designFull && !responseOpen && (
+              <button
+                type="button"
+                className="icon-btn response-open-btn"
+                aria-label={unseen ? "レスポンスを表示（新しい結果があります）" : "レスポンスを表示"}
+                title={unseen ? "レスポンスを表示（新しい結果があります）" : "レスポンスを表示"}
+                onClick={() => setResponseOpen(true)}
+              >
+                <PanelRightIcon />
+                {unseen && <span className="response-open-dot" aria-hidden="true" />}
+              </button>
+            )}
           </div>
           <div className="pane-body" role="tabpanel">
             {tab.requestPane === "params" && <ParamsPanel spec={tab.spec} onChange={onSpec} unresolved={unresolved} meta={paramMeta} />}
@@ -348,7 +379,7 @@ export function RequestEditor({ project, tab }: { project: Project; tab: Request
           </div>
         </section>
 
-        {!designFull && <ResponsePane tab={tab} />}
+        {showResponse && <ResponsePane tab={tab} onClose={() => setResponseOpen(false)} />}
       </div>
     </>
   );

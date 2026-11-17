@@ -102,7 +102,6 @@ describe("認証タブ: 自動化のチェック（M5）", () => {
 
     // baseUrl と違う送り先（手で作ったリクエスト）には、セッションを付けない
     await user.click(screen.getByRole("button", { name: "新しいタブ" }));
-    await user.click(await screen.findByRole("button", { name: /HTTP リクエスト/ }));
     const url = await screen.findByLabelText("リクエストURL");
     await user.click(url);
     await user.paste("https://other.example/api/v1/x");

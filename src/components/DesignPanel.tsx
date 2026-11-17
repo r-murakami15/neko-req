@@ -214,7 +214,7 @@ function ParamTable({ params }: { params: ParamDoc[] }) {
           {params.map((p) => (
             <tr key={`${p.location}:${p.name}`}>
               <td className="schema-name mono">{p.name}</td>
-              <td>{PARAM_IN_LABEL[p.location]}</td>
+              <td className="schema-in">{PARAM_IN_LABEL[p.location]}</td>
               <td className="schema-type mono">{p.typeLabel}</td>
               <td className="schema-required">{p.required ? "必須" : ""}</td>
               <td className="schema-constraints">

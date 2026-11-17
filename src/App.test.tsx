@@ -72,8 +72,10 @@ describe("外枠", () => {
     expect(screen.getByRole("tablist", { name: "開いているリクエスト" })).toBeInTheDocument();
     expect(screen.getByText("開いているリクエストはありません")).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "リクエスト" })).not.toBeInTheDocument();
-    expect(await screen.findByText(/保存先:/)).toBeInTheDocument();
-    expect(screen.getByText("OpenAPI は未取り込み")).toBeInTheDocument();
+    // 右下にはアプリの版。保存先のパスと取り込み状態の文言は出さない
+    expect(await screen.findByText("NekoReq v0.1.0")).toBeInTheDocument();
+    expect(screen.queryByText(/保存先:/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/未取り込み/)).not.toBeInTheDocument();
 
     await user.click(within(sidebar).getByRole("button", { name: "新規作成" }));
     const dialog = await screen.findByRole("dialog", { name: "新規作成" });

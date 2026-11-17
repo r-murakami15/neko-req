@@ -7,7 +7,7 @@ export function isMac(): boolean {
 }
 
 export interface Shortcut {
-  id: "send" | "save" | "newTab" | "closeTab" | "search" | "settings";
+  id: "send" | "save" | "newTab" | "closeTab" | "search" | "settings" | "toggleResponse";
   label: string;
   /** 修飾キーを除いたキー（`event.key` と比べる。小文字）。 */
   key: string;
@@ -19,10 +19,11 @@ export interface Shortcut {
 export const SHORTCUTS: Shortcut[] = [
   { id: "send", label: "リクエストを送信", key: "enter", keyLabel: "Enter" },
   { id: "save", label: "保存", key: "s", keyLabel: "S" },
-  { id: "newTab", label: "新しいタブ", key: "t", keyLabel: "T" },
+  { id: "newTab", label: "空のリクエストを新しいタブで開く", key: "t", keyLabel: "T" },
   { id: "closeTab", label: "タブを閉じる", key: "w", keyLabel: "W" },
   { id: "search", label: "リクエストを検索", key: "k", keyLabel: "K" },
   { id: "settings", label: "設定を開く", key: ",", keyLabel: "," },
+  { id: "toggleResponse", label: "レスポンス欄を開閉", key: "r", keyLabel: "Shift R" },
 ];
 
 /** `⌘ Enter` / `Ctrl Enter` の形。 */

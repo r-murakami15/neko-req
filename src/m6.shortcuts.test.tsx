@@ -45,12 +45,19 @@ describe("ショートカット（Windows は Ctrl、macOS は ⌘）", () => {
     await waitFor(() => expect(within(screen.getByRole("tab", { name: /取引先一覧取得/ })).queryByRole("img", { name: "未保存" })).not.toBeInTheDocument());
   });
 
-  it("Ctrl+T で新規作成、Ctrl+W でタブを閉じる（未保存なら確認する）", async () => {
+  it("Ctrl+T は、ダイアログなしで空のリクエストを新しいタブに開いて URL 欄にフォーカスする。Ctrl+W でタブを閉じる（未保存なら確認する）", async () => {
     const { user } = await setup();
     press("t");
-    expect(await screen.findByRole("dialog", { name: "新規作成" })).toBeInTheDocument();
-    await user.keyboard("{Escape}");
-    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    const url = await screen.findByLabelText("リクエストURL");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /新しいリクエスト/ })).toHaveAttribute("aria-selected", "true");
+    expect(url).toHaveValue("");
+    expect(url).toHaveFocus();
+    expect(screen.getAllByRole("tab", { name: /^(GET|POST|PUT|DELETE|PATCH)/ })).toHaveLength(2);
+
+    // 空のタブは変更なしなので、そのまま閉じる。前のタブに戻る
+    press("w");
+    await waitFor(() => expect(screen.queryByRole("tab", { name: /新しいリクエスト/ })).not.toBeInTheDocument());
 
     // 変更なしのタブは、そのまま閉じる
     press("w");
@@ -58,9 +65,8 @@ describe("ショートカット（Windows は Ctrl、macOS は ⌘）", () => {
 
     // 未保存のタブは、確認が出る
     await user.click(screen.getByRole("button", { name: "新しいタブ" }));
-    await user.click(await screen.findByRole("button", { name: /HTTP リクエスト/ }));
-    const url = await screen.findByLabelText("リクエストURL");
-    await user.click(url);
+    const draftUrl = await screen.findByLabelText("リクエストURL");
+    await user.click(draftUrl);
     await user.paste("{{baseUrl}}/x");
     press("w");
     const confirm = await screen.findByRole("dialog", { name: "タブを閉じますか？" });

@@ -1,11 +1,11 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { errorMessage, useBackend } from "../api";
 import { queryKeys, useAdhocList, useOperations, useSourceChanged } from "../api/queries";
 import type { AdHocRequest, OperationListItem, Project } from "../bindings";
 import { opKeyString } from "../lib/opkey";
-import { buildTree, summarize } from "../lib/tree";
+import { buildTree, locateRow, summarize } from "../lib/tree";
 import { closeTab } from "../store/send";
 import { openOperation } from "../store/ops";
 import { useTabsStore } from "../store/tabs";
@@ -45,16 +45,32 @@ export function Sidebar({ project }: { project: Project }) {
   const summary = summarize(ops);
   const hits = rows.filter((r) => r.type === "op" || r.type === "adhoc").length;
 
-  // タブで開いた API のフォルダが閉じていたら開く
-  const activeOp = activeTab?.op ?? null;
+  // 前面のタブの行が、ツリーのどのフォルダに入っているか（検索に当たっていない・ツリーにない行は `null`）
+  const location = useMemo(
+    () => (activeKey === null ? null : locateRow(activeKey, { ops, adhocs: items, query })),
+    [activeKey, ops, items, query],
+  );
+  const activeFolderId = location?.status === "ok" ? location.folderId : null;
+
+  // 前面のタブが変わったら、ツリーでその行を示す: 入っているフォルダが閉じていたら開き、開いたあとの行の位置までスクロールする。
+  // ユーザーがあとでフォルダを閉じたら閉じたまま（次に前面のタブが変わるまで開かない）。検索に当たっていない行は何もしない。
+  // データがまだ読み込めていない（前回のタブの復元が先に済んだ）ときは、読み込めたところでやり直す。
+  const revealedKey = useRef<string | null>(null);
+  const [reveal, setReveal] = useState<{ key: string; nonce: number } | null>(null);
   useEffect(() => {
-    if (!activeOp) return;
-    const key = opKeyString(activeOp.opKey);
-    const item = ops.find((o) => !o.deleted && opKeyString(o.opKey) === key);
-    if (!item) return;
-    const id = `tag:${item.folder ?? ""}`;
-    setExpanded((prev) => (prev[id] === undefined ? { ...prev, [id]: true } : prev));
-  }, [activeOp, ops]);
+    if (activeKey === null) {
+      revealedKey.current = null;
+      return;
+    }
+    if (revealedKey.current === activeKey || !location || location.status === "missing") return;
+    revealedKey.current = activeKey;
+    if (location.status === "hidden") return;
+    const folderId = location.folderId;
+    // 検索中はフォルダがすべて開いているので、開閉の状態は触らない
+    if (folderId !== null && query.trim() === "") setExpanded((prev) => (prev[folderId] === true ? prev : { ...prev, [folderId]: true }));
+    // 開閉の状態と同じ描画で行が増えるので、スクロールは ApiTree が、増えたあとの位置で行う
+    setReveal((prev) => ({ key: activeKey, nonce: (prev?.nonce ?? 0) + 1 }));
+  }, [activeKey, location]);
 
   const toggle = (id: string) =>
     setExpanded((prev) => {
@@ -141,6 +157,8 @@ export function Sidebar({ project }: { project: Project }) {
       <ApiTree
         rows={rows}
         activeKey={activeKey}
+        activeFolderId={activeFolderId}
+        reveal={reveal}
         emptyMessage={emptyMessage}
         onToggle={toggle}
         onOpenOp={(item) => void open(item)}

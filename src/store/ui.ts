@@ -50,6 +50,16 @@ interface UiState {
   /** 同期の確認ダイアログ。 */
   syncDialogOpen: boolean;
   setSyncDialogOpen: (open: boolean) => void;
+  /** レスポンス欄を開いているか（アプリ全体で 1 つ。再起動しても覚える）。 */
+  responseOpen: boolean;
+  setResponseOpen: (open: boolean) => void;
+  /** 閉じている間に結果が届いたタブ（開くか、そのタブのレスポンス欄が見えたら外す）。覚えない。 */
+  unseenResponses: Record<string, true | undefined>;
+  markResponseUnseen: (tabId: string) => void;
+  clearResponseUnseen: (tabId: string) => void;
+  /** 開いたばかりの空のタブで、URL 欄にフォーカスを入れる（そのタブの画面が出たら使う）。覚えない。 */
+  focusUrlTabId: string | null;
+  setFocusUrlTabId: (tabId: string | null) => void;
 }
 
 export const useUiStore = create<UiState>()(
@@ -69,12 +79,24 @@ export const useUiStore = create<UiState>()(
       setImportDialogOpen: (open) => set({ importDialogOpen: open }),
       syncDialogOpen: false,
       setSyncDialogOpen: (open) => set({ syncDialogOpen: open }),
+      responseOpen: true,
+      setResponseOpen: (open) => set({ responseOpen: open }),
+      unseenResponses: {},
+      markResponseUnseen: (tabId) => set((s) => ({ unseenResponses: { ...s.unseenResponses, [tabId]: true } })),
+      clearResponseUnseen: (tabId) =>
+        set((s) => {
+          if (!s.unseenResponses[tabId]) return s;
+          const { [tabId]: _removed, ...rest } = s.unseenResponses;
+          return { unseenResponses: rest };
+        }),
+      focusUrlTabId: null,
+      setFocusUrlTabId: (tabId) => set({ focusUrlTabId: tabId }),
     }),
     {
       name: "nekoreq-ui",
       storage: createJSONStorage(() => safeStorage),
-      // 覚えておくのは開いていたプロジェクトだけ
-      partialize: (state) => ({ currentProjectId: state.currentProjectId }),
+      // 覚えておくのは、開いていたプロジェクトとレスポンス欄の開閉
+      partialize: (state) => ({ currentProjectId: state.currentProjectId, responseOpen: state.responseOpen }),
     },
   ),
 );

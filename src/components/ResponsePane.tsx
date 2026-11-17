@@ -9,7 +9,7 @@ import { prettyResponseJson, tokenizeJson } from "../lib/json";
 import { parseProblem } from "../lib/problem";
 import { describeLocation } from "../lib/vars";
 import { type BodyMode, type RequestTab, type ResponsePane as Pane, useTabsStore } from "../store/tabs";
-import { SearchIcon } from "./Icons";
+import { CloseIcon, SearchIcon } from "./Icons";
 
 /** この文字数を超える JSON は、色分けせずにそのまま見せる（重くならないように）。 */
 const MAX_HIGHLIGHT_CHARS = 300_000;
@@ -43,13 +43,33 @@ function fileNameFor(contentType: string | null): string {
   return "response.bin";
 }
 
-/** レスポンス欄。送信前・送信中・失敗・成功（ボディ / ヘッダー / タイミング）を出し分ける。 */
-export function ResponsePane({ tab }: { tab: RequestTab }) {
+/** レスポンス欄を閉じるボタン。 */
+function CloseResponseButton({ onClose }: { onClose: () => void }) {
+  return (
+    <button type="button" className="icon-btn response-close-btn" aria-label="レスポンスを閉じる" title="レスポンスを閉じる" onClick={onClose}>
+      <CloseIcon />
+    </button>
+  );
+}
+
+/** 送信前・送信中・失敗のときの見出し（成功のときは、ステータスなどの行にボタンを置く）。 */
+function ResponseHead({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="response-bar response-head">
+      <span className="response-title">レスポンス</span>
+      <CloseResponseButton onClose={onClose} />
+    </div>
+  );
+}
+
+/** レスポンス欄。送信前・送信中・失敗・成功（ボディ / ヘッダー / タイミング）を出し分ける。`onClose` で欄ごと閉じる。 */
+export function ResponsePane({ tab, onClose }: { tab: RequestTab; onClose: () => void }) {
   const { send } = tab;
 
   if (send.phase === "idle") {
     return (
       <section className="pane pane-response" aria-label="レスポンス">
+        <ResponseHead onClose={onClose} />
         <div className="pane-placeholder">
           送信すると、ステータス・時間・サイズとレスポンスの 3 タブ（ボディ・ヘッダー・タイミング）がここに出ます。
         </div>
@@ -59,6 +79,7 @@ export function ResponsePane({ tab }: { tab: RequestTab }) {
   if (send.phase === "sending" || send.outcome === null) {
     return (
       <section className="pane pane-response" aria-label="レスポンス">
+        <ResponseHead onClose={onClose} />
         <div className="pane-placeholder" role="status">
           {send.cancelRequested ? "中止しています…" : "送信しています…"}
         </div>
@@ -69,6 +90,7 @@ export function ResponsePane({ tab }: { tab: RequestTab }) {
     const { error } = send.outcome;
     return (
       <section className="pane pane-response" aria-label="レスポンス">
+        <ResponseHead onClose={onClose} />
         <div className={`failure${error.kind === "cancelled" ? " failure-quiet" : ""}`} role="alert">
           <div className="failure-title">{ERROR_TITLES[error.kind]}</div>
           <div className="failure-message">{error.message}</div>
@@ -85,7 +107,7 @@ export function ResponsePane({ tab }: { tab: RequestTab }) {
       </section>
     );
   }
-  return <SuccessView tab={tab} response={send.outcome.response} />;
+  return <SuccessView tab={tab} response={send.outcome.response} onClose={onClose} />;
 }
 
 /** 送信の結果で自動更新した変数（session・xsrfToken）と、更新できなかった理由。 */
@@ -112,7 +134,7 @@ function AutoUpdateNotices({ tab }: { tab: RequestTab }) {
   );
 }
 
-function SuccessView({ tab, response }: { tab: RequestTab; response: ResponseData }) {
+function SuccessView({ tab, response, onClose }: { tab: RequestTab; response: ResponseData; onClose: () => void }) {
   const patch = useTabsStore((s) => s.patch);
   const projects = useProjects();
   const autoCsrf = projects.data?.find((p) => p.id === tab.projectId)?.settings?.autoCsrf ?? true;
@@ -150,6 +172,7 @@ function SuccessView({ tab, response }: { tab: RequestTab; response: ResponseDat
             </button>
           ))}
         </div>
+        <CloseResponseButton onClose={onClose} />
       </div>
       <div className="response-content" role="tabpanel">
         {pane === "body" && <BodyView tab={tab} response={response} />}

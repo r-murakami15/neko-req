@@ -9,7 +9,8 @@ import { openOp, setupWithApi } from "./test/openapi";
 afterEach(() => vi.restoreAllMocks());
 
 async function openCurlDialog(user: UserEvent) {
-  await user.click(screen.getByRole("button", { name: "新しいタブ" }));
+  // タブの「＋」はすぐ空のタブを開くので、新規作成ダイアログはサイドバーの「＋」から開く
+  await user.click(within(screen.getByRole("navigation", { name: "API ツリー" })).getByRole("button", { name: "新規作成" }));
   return screen.findByRole("dialog", { name: "新規作成" });
 }
 
@@ -193,7 +194,6 @@ describe("今のリクエストを cURL としてコピー", () => {
   it("展開できない変数があるときは、メッセージを出す", async () => {
     const { user } = await setupWithApi();
     await user.click(screen.getByRole("button", { name: "新しいタブ" }));
-    await user.click(await screen.findByRole("button", { name: /HTTP リクエスト/ }));
     const url = await screen.findByLabelText("リクエストURL");
     await user.click(url);
     await user.paste("{{nope}}/x");

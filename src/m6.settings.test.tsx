@@ -242,7 +242,7 @@ describe("設定ダイアログ", () => {
   it("ショートカットの一覧は OS の表記（Windows は Ctrl、macOS は ⌘）で出る", async () => {
     const { dialog } = await setup();
     const keys = within(dialog).getByRole("heading", { level: 2, name: "ショートカット" }).closest("section")!;
-    expect([...keys.querySelectorAll("kbd")].map((k) => k.textContent)).toEqual(["Ctrl Enter", "Ctrl S", "Ctrl T", "Ctrl W", "Ctrl K", "Ctrl ,"]);
+    expect([...keys.querySelectorAll("kbd")].map((k) => k.textContent)).toEqual(["Ctrl Enter", "Ctrl S", "Ctrl T", "Ctrl W", "Ctrl K", "Ctrl ,", "Ctrl Shift R"]);
     expect(within(keys).getByText("リクエストを送信")).toBeInTheDocument();
     expect(within(keys).getByText("タブを閉じる")).toBeInTheDocument();
   });
@@ -251,7 +251,7 @@ describe("設定ダイアログ", () => {
     vi.spyOn(navigator, "platform", "get").mockReturnValue("MacIntel");
     const { dialog } = await setup();
     const keys = within(dialog).getByRole("heading", { level: 2, name: "ショートカット" }).closest("section")!;
-    expect([...keys.querySelectorAll("kbd")].map((k) => k.textContent)).toEqual(["⌘ Enter", "⌘ S", "⌘ T", "⌘ W", "⌘ K", "⌘ ,"]);
+    expect([...keys.querySelectorAll("kbd")].map((k) => k.textContent)).toEqual(["⌘ Enter", "⌘ S", "⌘ T", "⌘ W", "⌘ K", "⌘ ,", "⌘ Shift R"]);
     expect(within(dialog).getByText("NekoReq バージョン 0.1.0 · macOS")).toBeInTheDocument();
   });
 });

@@ -13,7 +13,6 @@ const SAVE_WAIT = { timeout: SESSION_SAVE_DEBOUNCE_MS + 1500 };
 
 async function newRequestTab(user: UserEvent) {
   await user.click(screen.getByRole("button", { name: "新しいタブ" }));
-  await user.click(await screen.findByRole("button", { name: /HTTP リクエスト/ }));
   return screen.findByLabelText("リクエストURL");
 }
 

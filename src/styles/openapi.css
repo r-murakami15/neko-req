@@ -148,6 +148,9 @@
 }
 .tree-scroll {
   position: relative;
+  /* ツリーの文字は選択させない（ダブルクリックや Shift＋クリックで行の文字が選ばれないように。WebKit は接頭辞が要る） */
+  -webkit-user-select: none;
+  user-select: none;
   flex: 1 1 auto;
   min-height: 0;
   overflow-x: hidden;
@@ -908,7 +911,8 @@
 
 /* ---- 設計タブ ---- */
 
-.panes.is-design .pane-request {
+.panes.is-design .pane-request,
+.panes.is-response-closed .pane-request {
   flex-basis: 100%;
   border-right: 0;
 }
@@ -1050,6 +1054,8 @@
 }
 .schema-table th {
   padding: 8px 14px;
+  /* 見出しは折り返さない（狭い列で「場所」「必須」が 1 文字ずつ縦に並ばないように） */
+  white-space: nowrap;
   color: var(--text-subtle);
   font-size: 12px;
   font-weight: 500;
@@ -1063,8 +1069,19 @@
 .schema-name.is-root {
   color: var(--var);
 }
+/*
+ * 列の最小幅。合計が表示幅を超えるときは、表を折り返さずに横スクロールする（.schema-wrap）。
+ * 短い値の列（場所・必須）は折り返さず、長くなりうる列（名前・型・例）は最小幅を確保したうえで単語の途中でも折り返す。
+ */
+.schema-in {
+  min-width: 64px;
+  white-space: nowrap;
+}
 .schema-type {
+  /* 型名（ClientListApiResponse などの $ref の名前）が途中で折り返さない程度の幅 */
+  min-width: 200px;
   color: var(--json-string);
+  overflow-wrap: anywhere;
 }
 .schema-type.is-struct {
   color: var(--json-key);
@@ -1078,19 +1095,21 @@
   font-size: 12px;
 }
 .schema-example {
+  min-width: 120px;
   color: var(--text-muted);
   font-size: 12px;
   overflow-wrap: anywhere;
 }
 .schema-desc {
-  min-width: 220px;
+  min-width: 260px;
   color: var(--text-sub);
 }
 .schema-name {
-  min-width: 120px;
+  min-width: 140px;
+  overflow-wrap: anywhere;
 }
 .schema-constraints {
-  min-width: 120px;
+  min-width: 160px;
 }
 .is-circular .schema-name {
   color: var(--warn-text);
@@ -1216,8 +1235,15 @@
 .md table {
   width: 100%;
   border-collapse: collapse;
+  /*
+   * .md の overflow-wrap: anywhere を表の中では使わない。anywhere だと列の最小幅が「1 文字」と見なされ、
+   * 表が狭いと 404 や RESOURCE_NOT_FOUND が 1 文字ずつ縦に折り返す。break-word なら列は一番長い単語より
+   * 狭くならず、入りきらない表は .md-table-wrap で横スクロールになる。
+   */
+  overflow-wrap: break-word;
 }
 .md th {
+  white-space: nowrap;
   padding: 8px 12px;
   background: var(--bg-code);
   color: var(--text-muted);
@@ -1228,6 +1254,7 @@
 .md td {
   padding: 8px 12px;
   border-top: 1px solid var(--border);
+  vertical-align: top;
 }
 
 /* ---- レイアウトの補正: 中身が長い設計タブでも、タブ列や URL 欄が縮まないようにする ---- */
