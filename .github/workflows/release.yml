@@ -37,7 +37,8 @@ jobs:
         with:
           node-version: 20
           cache: npm
-      - uses: dtolnay/rust-toolchain@stable
+      # 開発コンテナ（docker/Dockerfile）と同じ Rust 1.90 に固定する（新しい版の clippy の lint で落ちないように）
+      - uses: dtolnay/rust-toolchain@1.90.0
         with:
           targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
       - uses: Swatinem/rust-cache@v2
