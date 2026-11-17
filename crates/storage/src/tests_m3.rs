@@ -122,7 +122,7 @@ fn migration_v3_to_v4_keeps_existing_data() {
         .unwrap();
     }
     let db = Database::open(&path).unwrap();
-    assert_eq!(db.schema_version().unwrap(), 4);
+    assert_eq!(db.schema_version().unwrap(), LATEST_VERSION);
     let p = db.project_get("p1").unwrap().unwrap();
     let s = p.source.unwrap();
     assert!(!s.has_token && s.allowed_hosts.is_empty());

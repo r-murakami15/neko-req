@@ -290,7 +290,7 @@ describe("同期", () => {
     await user.click(within(ask).getByRole("button", { name: "ファイルを選択…" }));
     await user.click(within(dialog).getByRole("button", { name: "差分を確認" }));
     expect(await within(dialog).findByText(/追加 1 · 変更 1 · 削除 1/)).toBeInTheDocument();
-    expect(sync).toHaveBeenLastCalledWith(expect.any(String), { paths: ["/mock/api/openapi.yaml", "/mock/api/common.yaml"], entry: null });
+    expect(sync).toHaveBeenLastCalledWith(expect.any(String), { paths: ["/mock/api/openapi.yaml", "/mock/api/common.yaml"], entry: null }, null);
   });
 
   it("URL 方式のプロジェクトでは、同期ダイアログからアクセストークンを保存・消せる", async () => {

@@ -301,6 +301,7 @@ fn hand_written_content_type_wins_for_json_form_and_text_but_not_multipart() {
         name: "a".into(),
         value: MultipartValue::Text("1".into()),
         enabled: true,
+        content_type: None,
     }]);
     let p = build(&s, &VarScope::new());
     let cts = headers_named(&p, "Content-Type");
@@ -309,6 +310,28 @@ fn hand_written_content_type_wins_for_json_form_and_text_but_not_multipart() {
         cts[0].starts_with("multipart/form-data; boundary="),
         "{cts:?}"
     );
+}
+
+#[test]
+fn multipart_part_content_types_are_carried_to_the_prepared_parts() {
+    let mut s = spec("POST", "http://h/");
+    let part = |name: &str, ct: Option<&str>| MultipartPart {
+        name: name.into(),
+        value: MultipartValue::Text("v".into()),
+        enabled: true,
+        content_type: ct.map(Into::into),
+    };
+    s.body = Body::Multipart(vec![
+        part("a", Some(" application/json ")),
+        part("b", None),
+        part("c", Some("   ")),
+    ]);
+    let p = build(&s, &VarScope::new());
+    let PreparedBody::Multipart { parts, .. } = &p.body else {
+        panic!("multipart のはず")
+    };
+    let types: Vec<_> = parts.iter().map(|p| p.content_type.as_deref()).collect();
+    assert_eq!(types, [Some("application/json"), None, None]);
 }
 
 #[test]
@@ -535,21 +558,25 @@ fn multipart_has_a_unique_boundary_matching_the_header_and_keeps_part_order() {
                 name: "b".into(),
                 value: MultipartValue::Text("2".into()),
                 enabled: true,
+                content_type: None,
             },
             MultipartPart {
                 name: "off".into(),
                 value: MultipartValue::Text("x".into()),
                 enabled: false,
+                content_type: None,
             },
             MultipartPart {
                 name: "a".into(),
                 value: MultipartValue::File("/tmp/x.bin".into()),
                 enabled: true,
+                content_type: None,
             },
             MultipartPart {
                 name: "".into(),
                 value: MultipartValue::Text("nameless".into()),
                 enabled: true,
+                content_type: None,
             },
         ]);
         build(&s, &VarScope::new())
@@ -589,6 +616,7 @@ fn multipart_with_no_usable_parts_sends_nothing() {
         name: "a".into(),
         value: MultipartValue::Text("1".into()),
         enabled: false,
+        content_type: None,
     }]);
     let p = build(&s, &VarScope::new());
     assert_eq!(p.body, PreparedBody::None);
@@ -700,16 +728,19 @@ fn form_and_multipart_row_numbers_count_disabled_rows() {
             name: "a".into(),
             value: MultipartValue::Text("1".into()),
             enabled: false,
+            content_type: None,
         },
         MultipartPart {
             name: "b".into(),
             value: MultipartValue::Text("1".into()),
             enabled: false,
+            content_type: None,
         },
         MultipartPart {
             name: "{{pn}}".into(),
             value: MultipartValue::File("{{fp}}".into()),
             enabled: true,
+            content_type: None,
         },
     ]);
     let u = unresolved_of(&s, &VarScope::new());
@@ -885,11 +916,13 @@ fn referenced_variables_covers_names_urls_paths_and_all_body_kinds_without_dynam
             name: "{{pn}}".into(),
             value: MultipartValue::File("{{fp}}".into()),
             enabled: true,
+            content_type: None,
         },
         MultipartPart {
             name: "{{poff}}".into(),
             value: MultipartValue::Text("{{x}}".into()),
             enabled: false,
+            content_type: None,
         },
     ]);
     s.auth = Some(AuthOverride::ApiKey {

@@ -439,6 +439,59 @@ impl Database {
         get_env(&conn, &env.id)?.ok_or_else(|| env_not_found(&env.id))
     }
 
+    /// 環境に、シークレットの変数 `name` があるようにする（自動更新用。環境の他の内容は触らない）。
+    ///
+    /// - なければ末尾に足す（有効・説明は `description`）。
+    /// - 通常の変数なら、シークレットに変える（元の値は SQLite に残さない）。
+    /// - すでにシークレットなら何もしない（有効・無効もそのまま）。
+    ///
+    /// 変更したら `true`。
+    pub fn env_var_ensure_secret(
+        &self,
+        environment_id: &str,
+        name: &str,
+        description: &str,
+    ) -> Result<bool> {
+        let mut conn = self.conn();
+        let env = get_env(&conn, environment_id)?.ok_or_else(|| env_not_found(environment_id))?;
+        let tx = conn.transaction()?;
+        let changed = match env.vars.iter().find(|v| v.name == name) {
+            Some(v) if v.value == VarValue::Secret => false,
+            Some(_) => {
+                tx.execute(
+                    "UPDATE env_vars SET kind = 'secret', value = NULL
+                     WHERE environment_id = ?1 AND name = ?2",
+                    params![environment_id, name],
+                )?;
+                true
+            }
+            None => {
+                let next: i64 = tx.query_row(
+                    "SELECT COALESCE(MAX(sort_order) + 1, 0) FROM env_vars WHERE environment_id = ?1",
+                    [environment_id],
+                    |row| row.get(0),
+                )?;
+                tx.execute(
+                    "INSERT INTO env_vars (environment_id, name, kind, value, description, sort_order, enabled)
+                     VALUES (?1, ?2, 'secret', NULL, ?3, ?4, 1)",
+                    params![environment_id, name, description, next],
+                )?;
+                true
+            }
+        };
+        if changed {
+            tx.execute(
+                "UPDATE environments SET updated_at = ?2 WHERE id = ?1",
+                params![environment_id, now()],
+            )?;
+        }
+        tx.commit()?;
+        if changed {
+            Database::truncate_wal(&conn);
+        }
+        Ok(changed)
+    }
+
     /// プロジェクトの「選んでいる環境」を決める（`None` で未選択）。「グローバル」は選べない。
     /// 更新後のプロジェクトを返す。
     pub fn env_select(&self, project_id: &str, environment_id: Option<&str>) -> Result<Project> {

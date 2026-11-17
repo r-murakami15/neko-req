@@ -25,6 +25,9 @@ pub enum AppError {
     /// ファイルの書き込みなどのエラー。
     #[error("{0}")]
     Io(String),
+    /// 更新の確認・入れ替えのエラー（ネットワーク・署名の検証など）。
+    #[error("{0}")]
+    Update(String),
 }
 
 impl From<SecretError> for AppError {

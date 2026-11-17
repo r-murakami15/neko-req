@@ -190,8 +190,24 @@ pub struct MediaTypeSpec {
     pub content_type: String,
     /// `ParamSpec.schema` と同じ形。
     pub schema: Option<serde_json::Value>,
-    /// yaml のメディア型に書かれた `example`（なければ `examples` の最初の値）。スキーマから作った例は含まない。
+    /// yaml のメディア型に書かれた `example`（なければ `examples` の最初の値。`examples` の先頭と同じ値）。
+    /// スキーマから作った例は含まない。
     pub example: Option<serde_json::Value>,
+    /// yaml に書かれた例のすべて（`example` があれば名前 `example` で先頭に、続いて `examples` を書かれた順に）。
+    /// 古い保存データには無いので、読み込みでは空にする。
+    #[serde(default)]
+    pub examples: Vec<NamedExample>,
+}
+
+/// 名前つきの例（メディア型の `examples` の 1 件）。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct NamedExample {
+    /// `examples` のキー。単数の `example` は `example`、配列で書かれた例は `example 1`・`example 2`…。
+    pub name: String,
+    pub summary: Option<String>,
+    pub description: Option<String>,
+    pub value: serde_json::Value,
 }
 
 /// yaml の responses の 1 ステータス。

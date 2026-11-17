@@ -14,6 +14,10 @@ use percent_encoding::utf8_percent_encode;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
+use crate::auto_auth::{
+    is_csrf_safe_method, origin_of, AutoAuth, SESSION_COOKIE, SESSION_VAR, SOURCE_CSRF,
+    SOURCE_SESSION, XSRF_COOKIE, XSRF_HEADER, XSRF_VAR,
+};
 use crate::history::HeaderPair;
 use crate::redact::{redact_header_value, redact_text};
 use crate::request::{ApiKeyIn, AuthOverride, Body, KeyValue, MultipartValue, ParamIn};
@@ -98,6 +102,8 @@ pub enum PreparedBody {
 pub struct PreparedPart {
     pub name: String,
     pub value: PreparedPartValue,
+    /// パートの Content-Type（`MultipartPart.content_type`。なければ送信側が決める）。
+    pub content_type: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -126,7 +132,8 @@ pub enum BuildError {
 pub struct AutoHeader {
     pub name: String,
     pub value: String,
-    /// 付く理由（「認証」「ボディ」「アプリ既定」「URL から」）。
+    /// 付く理由（「認証（Bearer）」「認証タブ（cookieAuth）」「CSRF の自動付与」「Cookie」「ボディ」「アプリ既定」
+    /// 「URL から」など。Cookie は複数の出どころを「、」でつなぐ）。
     pub source: String,
 }
 
@@ -193,6 +200,8 @@ pub struct RequestPreview {
     /// URL を読めないときの理由（送信できない）。
     pub url_error: Option<String>,
     pub auto_headers: Vec<AutoHeader>,
+    /// cookieAuth・CSRF の自動化についての説明（付かない理由など。値は含まない）。なければ空。
+    pub auto_notes: Vec<String>,
 }
 
 /// 組み立ての途中結果（プレビューと送信で共通）。
@@ -203,15 +212,27 @@ struct Assembly {
     url_error: Option<String>,
     auth_error: Option<String>,
     auto: Vec<AutoHeader>,
+    notes: Vec<String>,
 }
 
-/// 送信用のリクエストを組み立てる。
+/// 送信用のリクエストを組み立てる（cookieAuth・CSRF の自動化なし）。
 pub fn build_request(
     spec: &RequestSpec,
     scope: &VarScope,
     dynamics: &dyn DynamicSource,
 ) -> Result<PreparedRequest, BuildError> {
-    let a = assemble(spec, scope, dynamics);
+    build_request_with(spec, scope, dynamics, &AutoAuth::default())
+}
+
+/// 送信用のリクエストを組み立てる。`auto` の値（SESSION・XSRF-TOKEN の Cookie と X-XSRF-TOKEN ヘッダー）を、
+/// 手入力の同名のヘッダー・Cookie がなければ付ける。値は伏せ字の対象（`secrets`）に加える。
+pub fn build_request_with(
+    spec: &RequestSpec,
+    scope: &VarScope,
+    dynamics: &dyn DynamicSource,
+    auto: &AutoAuth,
+) -> Result<PreparedRequest, BuildError> {
+    let a = assemble(spec, scope, dynamics, auto);
     if !a.unresolved.is_empty() {
         return Err(BuildError::Unresolved(a.unresolved));
     }
@@ -224,13 +245,23 @@ pub fn build_request(
     Ok(a.prepared)
 }
 
-/// 展開後の URL と、展開できない変数の一覧を作る（送信はしない）。
+/// 展開後の URL と、展開できない変数の一覧を作る（送信はしない。自動化なし）。
 pub fn preview(
     spec: &RequestSpec,
     scope: &VarScope,
     dynamics: &dyn DynamicSource,
 ) -> RequestPreview {
-    let a = assemble(spec, scope, dynamics);
+    preview_with(spec, scope, dynamics, &AutoAuth::default())
+}
+
+/// `preview` に cookieAuth・CSRF の自動化の値を加えた版。自動で付くヘッダーは出どころつき・伏せ字で返す。
+pub fn preview_with(
+    spec: &RequestSpec,
+    scope: &VarScope,
+    dynamics: &dyn DynamicSource,
+    auto: &AutoAuth,
+) -> RequestPreview {
+    let a = assemble(spec, scope, dynamics, auto);
     let secrets = &a.prepared.secrets;
     let mut auto_headers: Vec<AutoHeader> = a
         .auto
@@ -278,6 +309,7 @@ pub fn preview(
         missing_path_params: a.missing_path_params,
         url_error: a.url_error,
         auto_headers,
+        auto_notes: a.notes,
     }
 }
 
@@ -300,6 +332,41 @@ fn host_header(url: &str) -> Option<String> {
         Some(port) => format!("{host}:{port}"),
         None => host.to_string(),
     })
+}
+
+/// URL のユーザー情報（`http://user:SECRET@host/`）にシークレットが入っていたら、reqwest がそこから作って送る
+/// `Authorization: Basic base64(user:pass)` の形（と `user:pass`）も伏せ字の対象に加える
+/// （サーバーがこのヘッダーを本文にエコーしても履歴に残さない）。URL の文字列そのままの形と、
+/// パーセントデコードした形（reqwest が送るのはこちら）の両方を足す。
+fn add_userinfo_secrets(url: &str, cx: &mut Cx<'_>) {
+    let Ok(u) = url::Url::parse(url) else {
+        return;
+    };
+    if u.username().is_empty() && u.password().is_none() {
+        return;
+    }
+    let decode = |s: &str| {
+        percent_encoding::percent_decode_str(s)
+            .decode_utf8_lossy()
+            .into_owned()
+    };
+    let (raw_user, raw_pass) = (
+        u.username().to_string(),
+        u.password().unwrap_or("").to_string(),
+    );
+    let (user, pass) = (decode(&raw_user), decode(&raw_pass));
+    let holds_secret = cx
+        .secrets
+        .iter()
+        .any(|s| user.contains(s.as_str()) || pass.contains(s.as_str()));
+    if !holds_secret {
+        return;
+    }
+    for (user, pass) in [(user, pass), (raw_user, raw_pass)] {
+        let pair = format!("{user}:{pass}");
+        cx.add_secret(&base64::engine::general_purpose::STANDARD.encode(&pair));
+        cx.add_secret(&pair);
+    }
 }
 
 struct Cx<'a> {
@@ -351,7 +418,12 @@ fn param_loc(location: ParamIn, row: u32, part: RowPart) -> VarLocation {
     }
 }
 
-fn assemble(spec: &RequestSpec, scope: &VarScope, dynamics: &dyn DynamicSource) -> Assembly {
+fn assemble(
+    spec: &RequestSpec,
+    scope: &VarScope,
+    dynamics: &dyn DynamicSource,
+    auto_auth: &AutoAuth,
+) -> Assembly {
     let mut cx = Cx {
         scope,
         dynamics,
@@ -407,8 +479,9 @@ fn assemble(spec: &RequestSpec, scope: &VarScope, dynamics: &dyn DynamicSource) 
     }
     let mut auto: Vec<AutoHeader> = Vec::new();
 
-    // Cookie
+    // Cookie（パラメータタブの Cookie と、認証タブの API キー（Cookie））
     let mut cookies: Vec<String> = Vec::new();
+    let mut cookie_sources: Vec<&str> = Vec::new();
     for (row, p) in rows_of(&spec.params, ParamIn::Cookie) {
         if !p.enabled {
             continue;
@@ -417,6 +490,9 @@ fn assemble(spec: &RequestSpec, scope: &VarScope, dynamics: &dyn DynamicSource) 
         let value = cx.expand(&p.value, param_loc(ParamIn::Cookie, row, RowPart::Value));
         if !name.trim().is_empty() {
             cookies.push(format!("{}={}", name.trim(), value));
+            if !cookie_sources.contains(&"Cookie") {
+                cookie_sources.push("Cookie");
+            }
         }
     }
 
@@ -483,7 +559,12 @@ fn assemble(spec: &RequestSpec, scope: &VarScope, dynamics: &dyn DynamicSource) 
                         add_auto(&mut headers, &mut auto, &name, value, "認証（API キー）")
                     }
                     ApiKeyIn::Query => query.push((name, value)),
-                    ApiKeyIn::Cookie => cookies.push(format!("{name}={value}")),
+                    ApiKeyIn::Cookie => {
+                        cookies.push(format!("{name}={value}"));
+                        if !cookie_sources.contains(&SOURCE_SESSION) {
+                            cookie_sources.push(SOURCE_SESSION);
+                        }
+                    }
                 }
             } else if name.is_empty() {
                 // 名前がなくても、値の未解決の変数は知らせる
@@ -505,7 +586,8 @@ fn assemble(spec: &RequestSpec, scope: &VarScope, dynamics: &dyn DynamicSource) 
                 h.value = format!("{}; {joined}", h.value.trim_end_matches(';').trim_end());
             }
         } else {
-            add_auto(&mut headers, &mut auto, "Cookie", joined, "Cookie・認証");
+            let source = cookie_sources.join("、");
+            add_auto(&mut headers, &mut auto, "Cookie", joined, &source);
         }
     }
 
@@ -526,6 +608,17 @@ fn assemble(spec: &RequestSpec, scope: &VarScope, dynamics: &dyn DynamicSource) 
     let unresolved = std::mem::take(&mut cx.unresolved);
     let keep: Vec<&str> = unresolved.iter().map(|u| u.name.as_str()).collect();
     let (url, url_error) = finish_url(&url_text, &query, unresolved.is_empty(), &keep);
+    add_userinfo_secrets(&url, &mut cx);
+
+    // cookieAuth・CSRF の自動化（送り先が環境の baseUrl と同じときだけ）
+    let notes = apply_auto_auth(
+        auto_auth,
+        &method,
+        &url,
+        &mut headers,
+        &mut auto,
+        &mut cx.secrets,
+    );
 
     Assembly {
         prepared: PreparedRequest {
@@ -540,7 +633,147 @@ fn assemble(spec: &RequestSpec, scope: &VarScope, dynamics: &dyn DynamicSource) 
         url_error,
         auth_error,
         auto,
+        notes,
     }
+}
+
+/// `Cookie` ヘッダーに入っている Cookie の名前（大文字小文字は区別する）。
+fn cookie_names(headers: &[HeaderPair]) -> Vec<String> {
+    headers
+        .iter()
+        .filter(|h| h.name.eq_ignore_ascii_case("Cookie"))
+        .flat_map(|h| h.value.split(';'))
+        .filter_map(|pair| pair.split_once('=').map(|(n, _)| n.trim().to_string()))
+        .collect()
+}
+
+/// cookieAuth・CSRF の自動化で、Cookie（`SESSION`・`XSRF-TOKEN`）と `X-XSRF-TOKEN` ヘッダーを足す。
+///
+/// - 送り先（確定した URL）の origin が `auto.origin`（環境の `baseUrl`）と同じときだけ付ける。
+/// - 手入力・既定の認証が同じ名前の Cookie・ヘッダーを付けていれば、それを優先して足さない。
+/// - 付けた値は `secrets`（伏せ字の対象）に加える。返り値はプレビューに添える説明。
+fn apply_auto_auth(
+    auto_auth: &AutoAuth,
+    method: &str,
+    url: &str,
+    headers: &mut Vec<HeaderPair>,
+    auto: &mut Vec<AutoHeader>,
+    secrets: &mut Vec<String>,
+) -> Vec<String> {
+    let mut notes = auto_auth.notes.clone();
+    let wants_session = auto_auth.session.is_some();
+    let wants_csrf = auto_auth.csrf_enabled;
+    if !wants_session && !wants_csrf {
+        return notes;
+    }
+    // 送り先が baseUrl と違う（URL を確定できていない場合も含む）
+    let same_origin = match (&auto_auth.origin, origin_of(url)) {
+        (Some(base), Some(dest)) => *base == dest,
+        _ => false,
+    };
+    if !same_origin {
+        if (wants_session || auto_auth.xsrf_token.is_some()) && auto_auth.origin.is_some() {
+            notes.push(format!(
+                "送り先が環境の baseUrl と違うため、{SESSION_VAR}・{XSRF_VAR} は自動では付けません"
+            ));
+        }
+        return notes;
+    }
+
+    let mut add_secret = |v: &str| {
+        if !v.is_empty() && !secrets.iter().any(|s| s == v) {
+            secrets.push(v.to_string());
+        }
+    };
+    let existing = cookie_names(headers);
+    let mut cookies: Vec<String> = Vec::new();
+    let mut sources: Vec<&str> = Vec::new();
+    if let Some(session) = &auto_auth.session {
+        if !existing.iter().any(|n| n == SESSION_COOKIE) {
+            add_secret(session);
+            cookies.push(format!("{SESSION_COOKIE}={session}"));
+            sources.push(SOURCE_SESSION);
+        }
+    }
+    if wants_csrf {
+        match &auto_auth.xsrf_token {
+            Some(token) => {
+                add_secret(token);
+                if !existing.iter().any(|n| n == XSRF_COOKIE) {
+                    cookies.push(format!("{XSRF_COOKIE}={token}"));
+                    sources.push(SOURCE_CSRF);
+                }
+                if !is_csrf_safe_method(method)
+                    && !headers
+                        .iter()
+                        .any(|h| h.name.eq_ignore_ascii_case(XSRF_HEADER))
+                {
+                    auto.push(AutoHeader {
+                        name: XSRF_HEADER.to_string(),
+                        value: token.clone(),
+                        source: SOURCE_CSRF.to_string(),
+                    });
+                    headers.push(HeaderPair {
+                        name: XSRF_HEADER.to_string(),
+                        value: token.clone(),
+                    });
+                }
+            }
+            None => {
+                if !is_csrf_safe_method(method)
+                    && !headers
+                        .iter()
+                        .any(|h| h.name.eq_ignore_ascii_case(XSRF_HEADER))
+                {
+                    notes.push(format!(
+                        "CSRF トークン（{XSRF_VAR}）がまだありません。GET で {XSRF_COOKIE} を受け取ると、{XSRF_HEADER} が自動で付きます"
+                    ));
+                }
+            }
+        }
+    }
+    if cookies.is_empty() {
+        return notes;
+    }
+    let joined = cookies.join("; ");
+    let source = sources.join("、");
+    if let Some(h) = headers
+        .iter_mut()
+        .find(|h| h.name.eq_ignore_ascii_case("Cookie"))
+    {
+        // すでにある Cookie ヘッダー（手入力・Cookie パラメータ・既定の認証）の後ろに足す
+        if h.value.trim().is_empty() {
+            h.value = joined.clone();
+        } else {
+            h.value = format!("{}; {joined}", h.value.trim_end_matches(';').trim_end());
+        }
+        match auto
+            .iter_mut()
+            .find(|a| a.name.eq_ignore_ascii_case("Cookie"))
+        {
+            Some(entry) => {
+                entry.value = h.value.clone();
+                entry.source = format!("{}、{source}", entry.source);
+            }
+            // 手入力の Cookie ヘッダーは自動のものではないので、足したぶんだけを自動で付いたものとして見せる
+            None => auto.push(AutoHeader {
+                name: "Cookie".to_string(),
+                value: joined,
+                source,
+            }),
+        }
+    } else {
+        auto.push(AutoHeader {
+            name: "Cookie".to_string(),
+            value: joined.clone(),
+            source,
+        });
+        headers.push(HeaderPair {
+            name: "Cookie".to_string(),
+            value: joined,
+        });
+    }
+    notes
 }
 
 /// 同じ名前のヘッダーがなければ足し、自動で付いたものとして記録する。
@@ -659,7 +892,17 @@ fn build_body(body: &Body, cx: &mut Cx<'_>) -> (PreparedBody, Option<String>) {
                         },
                     )),
                 };
-                out.push(PreparedPart { name, value });
+                let content_type = part
+                    .content_type
+                    .as_deref()
+                    .map(str::trim)
+                    .filter(|c| !c.is_empty())
+                    .map(str::to_string);
+                out.push(PreparedPart {
+                    name,
+                    value,
+                    content_type,
+                });
             }
             if out.is_empty() {
                 return (PreparedBody::None, None);

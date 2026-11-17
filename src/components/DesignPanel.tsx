@@ -2,7 +2,7 @@ import { useId, useState } from "react";
 
 import { errorMessage, useBackend } from "../api";
 import { useOperationDetail } from "../api/queries";
-import type { ErrorCodeEntry, MediaDoc, OperationDetail, ParamDoc, ResponseDoc } from "../bindings";
+import type { ErrorCodeEntry, JsonValue, MediaDoc, OperationDetail, ParamDoc, ResponseDoc } from "../bindings";
 import { formatDateTime } from "../lib/format";
 import { PARAM_IN_LABEL } from "../lib/opkey";
 import { methodColor } from "../lib/spec";
@@ -175,7 +175,7 @@ function DesignDocument({ projectId, detail, onApplyBody }: { projectId: string;
           <MediaView
             label="リクエストボディ"
             medias={body.contents}
-            onApply={(m) => (m.example !== null && isJsonType(m.contentType) ? () => onApplyBody(JSON.stringify(m.example, null, 2)) : undefined)}
+            onApply={(m, value) => (value !== null && isJsonType(m.contentType) ? () => onApplyBody(JSON.stringify(value, null, 2)) : undefined)}
           />
         )}
       </section>
@@ -239,7 +239,7 @@ function ParamTable({ params }: { params: ParamDoc[] }) {
 }
 
 /** Content-Type ごとのスキーマ表と例。Content-Type が複数あれば、タブで切り替える。 */
-function MediaView({ label, medias, onApply }: { label: string; medias: MediaDoc[]; onApply: (m: MediaDoc) => (() => void) | undefined }) {
+function MediaView({ label, medias, onApply }: { label: string; medias: MediaDoc[]; onApply: (m: MediaDoc, value: JsonValue | null) => (() => void) | undefined }) {
   const [index, setIndex] = useState(0);
   const media = medias[Math.min(index, medias.length - 1)];
   return (
@@ -261,8 +261,35 @@ function MediaView({ label, medias, onApply }: { label: string; medias: MediaDoc
         </div>
         {media.rows.length > 0 ? <SchemaTable rows={media.rows} label={`${label}のスキーマ`} /> : <p className="design-note">スキーマはありません。</p>}
       </div>
-      {media.example !== null && <ExampleBlock value={media.example} source={media.exampleSource} onApply={onApply(media)} />}
+      <ExampleSection key={media.contentType} label={label} media={media} onApply={onApply} />
     </div>
+  );
+}
+
+/**
+ * 例。名前つきの例（`examples`）が複数あれば、切り替えて見る。「ボディに反映」は、選んでいる例が入る。
+ * 名前つきの例がなければ、`example`（yaml の example・スキーマから作った例）を 1 つだけ見せる。
+ */
+function ExampleSection({ label, media, onApply }: { label: string; media: MediaDoc; onApply: (m: MediaDoc, value: JsonValue | null) => (() => void) | undefined }) {
+  const [index, setIndex] = useState(0);
+  const named = media.examples;
+  const current = named.length > 0 ? named[Math.min(index, named.length - 1)] : null;
+  const value = current ? current.value : media.example;
+  if (value === null) return null;
+  return (
+    <>
+      {named.length > 1 && (
+        <div className="segmented example-switch" role="tablist" aria-label={`${label}の例を切り替え`}>
+          {named.map((n, i) => (
+            <button key={`${n.name}-${i}`} type="button" role="tab" aria-selected={i === index} className="segmented-item" title={n.summary ?? undefined} onClick={() => setIndex(i)}>
+              {n.name}
+            </button>
+          ))}
+        </div>
+      )}
+      {current && (current.summary || current.description) && <p className="design-note example-summary">{current.summary ?? current.description}</p>}
+      <ExampleBlock value={value} source={media.exampleSource} onApply={onApply(media, value)} />
+    </>
   );
 }
 

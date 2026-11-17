@@ -8,7 +8,9 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use bytes::Bytes;
-use nekoreq_core::{AdHocRequest, Environment, OpKey, Project, RequestDraft, VarValue};
+use nekoreq_core::{
+    AdHocRequest, Environment, OpKey, Project, ProjectSettings, RequestDraft, VarValue,
+};
 use nekoreq_http::CancellationToken;
 use nekoreq_secrets::{KeyringSecretStore, SecretKey, SecretStore};
 use nekoreq_storage::{Database, LATEST_VERSION};
@@ -36,11 +38,17 @@ pub(crate) struct Inner {
     pub(crate) in_flight: Mutex<HashMap<String, CancellationToken>>,
     /// 直近のレスポンスのボディ全体（送信 ID → ボディ）。古いものから捨てる。
     pub(crate) bodies: Mutex<VecDeque<(String, Bytes)>>,
+    /// 自動更新（環境の変数の作成とシークレットの書き込み）を直列にする。
+    pub(crate) auto_lock: Mutex<()>,
 }
 
 impl Inner {
     pub(crate) fn in_flight(&self) -> MutexGuard<'_, HashMap<String, CancellationToken>> {
         self.in_flight.lock().unwrap_or_else(|p| p.into_inner())
+    }
+
+    pub(crate) fn auto_lock(&self) -> MutexGuard<'_, ()> {
+        self.auto_lock.lock().unwrap_or_else(|p| p.into_inner())
     }
 
     pub(crate) fn bodies(&self) -> MutexGuard<'_, VecDeque<(String, Bytes)>> {
@@ -67,6 +75,7 @@ impl AppState {
                 secrets,
                 in_flight: Mutex::new(HashMap::new()),
                 bodies: Mutex::new(VecDeque::new()),
+                auto_lock: Mutex::new(()),
             }),
         };
         // 前回の異常終了で残ったアップロードの一時フォルダを消す
@@ -105,6 +114,15 @@ impl AppState {
 
     pub fn project_rename(&self, id: &str, name: &str) -> Result<Project, AppError> {
         Ok(self.db().project_rename(id, name)?)
+    }
+
+    /// プロジェクトの設定（cookieAuth・CSRF の自動化のオン・オフ）を保存する。更新後のプロジェクトを返す。
+    pub fn project_settings_set(
+        &self,
+        id: &str,
+        settings: &ProjectSettings,
+    ) -> Result<Project, AppError> {
+        Ok(self.db().project_settings_set(id, settings)?)
     }
 
     /// プロジェクトを消す。その環境のシークレットもキーチェーンから消す（消せなくてもプロジェクトは消える）。

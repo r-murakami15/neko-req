@@ -1,0 +1,61 @@
+name: Release
+
+# タグ（v0.1.0 など）を push すると、macOS（Universal の .dmg）と Windows（.msi）をビルドして
+# GitHub Releases の「下書き」に置く。内容を確かめて手で公開する（docs/07-build-and-release.md）。
+# 自動更新用の latest.json と更新ファイルの署名（.sig）も同じリリースに付く。
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-latest
+            args: ""
+          - platform: macos-latest
+            args: "--target universal-apple-darwin"
+    runs-on: ${{ matrix.platform }}
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      # タグの版と tauri.conf.json の版が違うと、latest.json が古い版のまま公開されてしまう
+      - name: Check the tag matches the app version
+        shell: bash
+        run: |
+          conf_version="$(node -p "require('./src-tauri/tauri.conf.json').version")"
+          if [ "v${conf_version}" != "${GITHUB_REF_NAME}" ]; then
+            echo "タグ ${GITHUB_REF_NAME} と tauri.conf.json の version (${conf_version}) が違います" >&2
+            exit 1
+          fi
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+      - uses: Swatinem/rust-cache@v2
+      - run: npm ci
+
+      # OS のコード署名・公証はしない。macOS は ad-hoc 署名（tauri.conf.json の signingIdentity: "-"）だけ付く。
+      # TAURI_SIGNING_PRIVATE_KEY / _PASSWORD は updater 用の鍵（OS の署名とは別）。
+      # Secrets の登録は docs/07-build-and-release.md を参照。
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "NekoReq ${{ github.ref_name }}"
+          releaseBody: "インストール方法と初回起動の手順は docs/07-build-and-release.md を参照。"
+          releaseDraft: true
+          prerelease: false
+          includeUpdaterJson: true
+          args: ${{ matrix.args }}

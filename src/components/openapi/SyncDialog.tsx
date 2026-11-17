@@ -44,6 +44,8 @@ function SyncFlow({ project }: { project: Project }) {
   const queryClient = useQueryClient();
   const [state, setState] = useState<State>({ kind: "checking" });
   const [uploadPaths, setUploadPaths] = useState<string[]>([]);
+  /** 読みに行ってよいと確認した別のホスト（origin）。確認すると Rust 側が覚えるので、以後は聞かれない。 */
+  const [allowedHosts, setAllowedHosts] = useState<string[]>([]);
   const alive = useRef(true);
   useEffect(() => {
     alive.current = true;
@@ -53,10 +55,10 @@ function SyncFlow({ project }: { project: Project }) {
   }, []);
 
   const check = useCallback(
-    async (upload: UploadInput | null) => {
+    async (upload: UploadInput | null, hosts: string[] | null = null) => {
       setState({ kind: "checking" });
       try {
-        const r = await backend.openapiSyncCheck(project.id, upload);
+        const r = await backend.openapiSyncCheck(project.id, upload, hosts);
         if (!alive.current) return;
         switch (r.status) {
           case "ready":
@@ -96,7 +98,7 @@ function SyncFlow({ project }: { project: Project }) {
     const used = uploadPaths.length > 0 ? upload(null) : null;
     setState({ kind: "applying" });
     try {
-      const r = await backend.openapiSyncApply(project.id, used);
+      const r = await backend.openapiSyncApply(project.id, used, allowedHosts.length > 0 ? allowedHosts : null);
       if (!alive.current) return;
       if (r.status === "applied") {
         setState({ kind: "applied", diff: r.diff, report: r.report });
@@ -189,7 +191,7 @@ function SyncFlow({ project }: { project: Project }) {
             </div>
             <UploadZone paths={uploadPaths} onChange={setUploadPaths} />
             <div className="import-issue-actions">
-              <button type="button" className="btn btn-primary btn-small" disabled={uploadPaths.length === 0} onClick={() => void check(upload(null))}>
+              <button type="button" className="btn btn-primary btn-small" disabled={uploadPaths.length === 0} onClick={() => void check(upload(null), allowedHosts.length > 0 ? allowedHosts : null)}>
                 差分を確認
               </button>
             </div>
@@ -202,7 +204,7 @@ function SyncFlow({ project }: { project: Project }) {
               {state.candidates.map((c) => (
                 <li key={c}>
                   <span className="mono entry-name">{c}</span>
-                  <button type="button" className="btn btn-small" onClick={() => void check(upload(c))}>
+                  <button type="button" className="btn btn-small" onClick={() => void check(upload(c), allowedHosts.length > 0 ? allowedHosts : null)}>
                     これを入口にする
                   </button>
                 </li>
@@ -212,9 +214,21 @@ function SyncFlow({ project }: { project: Project }) {
         )}
         {state.kind === "needsConfirmation" && (
           <div className="import-issue is-warn" role="group" aria-label="別のホストの確認">
-            <div className="import-issue-title">入口と別のサイトを指す参照があります。確認が済んでいないので、同期できません。</div>
+            <div className="import-issue-title">入口と別のサイトを指す参照があります。読みに行ってよいか確認してください。</div>
             <ForeignHosts foreign={state.foreign} />
-            <p className="muted-note">「OpenAPI取り込み」から取り込み直すと、読みに行ってよいか確認できます。</p>
+            <div className="import-issue-actions">
+              <button
+                type="button"
+                className="btn btn-primary btn-small"
+                onClick={() => {
+                  const hosts = [...new Set([...allowedHosts, ...state.foreign.map((f) => f.host)])];
+                  setAllowedHosts(hosts);
+                  void check(uploadPaths.length > 0 ? upload(null) : null, hosts);
+                }}
+              >
+                許可して続ける
+              </button>
+            </div>
           </div>
         )}
         {state.kind === "blocked" && (
@@ -234,7 +248,7 @@ function SyncFlow({ project }: { project: Project }) {
 
       <footer className="sync-footer">
         {(state.kind === "blocked" || state.kind === "error") && (
-          <button type="button" className="btn" onClick={() => void check(uploadPaths.length > 0 ? upload(null) : null)}>
+          <button type="button" className="btn" onClick={() => void check(uploadPaths.length > 0 ? upload(null) : null, allowedHosts.length > 0 ? allowedHosts : null)}>
             もう一度確認
           </button>
         )}

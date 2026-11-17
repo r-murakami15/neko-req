@@ -1,10 +1,12 @@
 import { useMemo, useState } from "react";
 
 import { errorMessage, useBackend } from "../api";
+import { useProjects } from "../api/queries";
 import type { ResponseData, SendError } from "../bindings";
 import { useCopy } from "../lib/clipboard";
 import { formatBytes, formatMs } from "../lib/format";
 import { prettyResponseJson, tokenizeJson } from "../lib/json";
+import { parseProblem } from "../lib/problem";
 import { describeLocation } from "../lib/vars";
 import { type BodyMode, type RequestTab, type ResponsePane as Pane, useTabsStore } from "../store/tabs";
 import { SearchIcon } from "./Icons";
@@ -12,7 +14,7 @@ import { SearchIcon } from "./Icons";
 /** この文字数を超える JSON は、色分けせずにそのまま見せる（重くならないように）。 */
 const MAX_HIGHLIGHT_CHARS = 300_000;
 
-const ERROR_TITLES: Record<SendError["kind"], string> = {
+export const ERROR_TITLES: Record<SendError["kind"], string> = {
   unresolved: "展開できない変数があるため、送信していません",
   invalidRequest: "リクエストの形が正しくないため、送信していません",
   bodyFile: "ボディのファイルを読めないため、送信していません",
@@ -86,8 +88,34 @@ export function ResponsePane({ tab }: { tab: RequestTab }) {
   return <SuccessView tab={tab} response={send.outcome.response} />;
 }
 
+/** 送信の結果で自動更新した変数（session・xsrfToken）と、更新できなかった理由。 */
+function AutoUpdateNotices({ tab }: { tab: RequestTab }) {
+  const { autoUpdates, autoUpdateSkipped } = tab.send;
+  if (autoUpdates.length === 0 && autoUpdateSkipped.length === 0) return null;
+  return (
+    <div className="auto-updates" role="status" aria-label="認証の自動更新">
+      {autoUpdates.map((u) => (
+        <div key={`${u.name}-${u.environmentId}-${u.action}`} className="auto-update is-ok">
+          <span aria-hidden="true">◆</span>
+          <span>
+            <span className="mono">{u.name}</span> を{u.action === "cleared" ? "消しました" : "更新しました"}（{u.environmentName}）
+          </span>
+        </div>
+      ))}
+      {autoUpdateSkipped.map((u) => (
+        <div key={`${u.name}-${u.reason}`} className="auto-update is-warn">
+          <span aria-hidden="true">!</span>
+          <span>更新できませんでした: {u.reason}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function SuccessView({ tab, response }: { tab: RequestTab; response: ResponseData }) {
   const patch = useTabsStore((s) => s.patch);
+  const projects = useProjects();
+  const autoCsrf = projects.data?.find((p) => p.id === tab.projectId)?.settings?.autoCsrf ?? true;
   const pane = tab.responsePane;
   const tabs: { id: Pane; label: string }[] = [
     { id: "body", label: "ボディ" },
@@ -97,6 +125,7 @@ function SuccessView({ tab, response }: { tab: RequestTab; response: ResponseDat
 
   return (
     <section className="pane pane-response" aria-label="レスポンス">
+      <AutoUpdateNotices tab={tab} />
       <div className="response-bar">
         <span className={`status-chip ${statusClass(response.status)}`} aria-label="ステータス">
           {`${response.status} ${response.statusText}`.trim()}
@@ -124,7 +153,7 @@ function SuccessView({ tab, response }: { tab: RequestTab; response: ResponseDat
       </div>
       <div className="response-content" role="tabpanel">
         {pane === "body" && <BodyView tab={tab} response={response} />}
-        {pane === "headers" && <HeadersView response={response} />}
+        {pane === "headers" && <HeadersView response={response} xsrfNote={autoCsrf} />}
         {pane === "timing" && <TimingView tab={tab} response={response} />}
       </div>
     </section>
@@ -236,22 +265,10 @@ function BodyView({ tab, response }: { tab: RequestTab; response: ResponseData }
   );
 }
 
-function parseProblem(contentType: string | null, content: string): { title?: string; code?: string; detail?: string } | null {
-  if (!/problem\+json/i.test(contentType ?? "")) return null;
-  try {
-    const v: unknown = JSON.parse(content);
-    if (v === null || typeof v !== "object") return null;
-    const o = v as Record<string, unknown>;
-    const str = (x: unknown) => (typeof x === "string" && x !== "" ? x : undefined);
-    const result = { title: str(o.title), code: str(o.code), detail: str(o.detail) };
-    return result.title || result.code || result.detail ? result : null;
-  } catch {
-    return null;
-  }
-}
-
-function HeadersView({ response }: { response: ResponseData }) {
+function HeadersView({ response, xsrfNote }: { response: ResponseData; xsrfNote: boolean }) {
   const [filter, setFilter] = useState("");
+  // Set-Cookie で XSRF-TOKEN を受け取った（値は伏せ字で届く）
+  const setsXsrf = response.headers.some((h) => h.name.toLowerCase() === "set-cookie" && h.value.trimStart().startsWith("XSRF-TOKEN="));
   const [copied, copy] = useCopy();
   const q = filter.trim().toLowerCase();
   const rows = response.headers.filter((h) => q === "" || h.name.toLowerCase().includes(q) || h.value.toLowerCase().includes(q));
@@ -296,6 +313,14 @@ function HeadersView({ response }: { response: ResponseData }) {
           </tbody>
         </table>
       </div>
+      {xsrfNote && setsXsrf && (
+        <div className="headers-note" role="note">
+          <span aria-hidden="true" className="headers-note-mark">
+            ◆
+          </span>
+          XSRF-TOKEN は保持され、次の GET 以外のリクエストで X-XSRF-TOKEN ヘッダーに自動で入ります
+        </div>
+      )}
     </div>
   );
 }

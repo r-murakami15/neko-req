@@ -54,8 +54,8 @@ export function createTauriBackend(): Backend {
 
     openapiPreview: (source, projectId) => unwrap(commands.openapiPreview(source, projectId)),
     openapiImport: (request) => unwrap(commands.openapiImport(request)),
-    openapiSyncCheck: (projectId, upload) => unwrap(commands.openapiSyncCheck(projectId, upload)),
-    openapiSyncApply: (projectId, upload) => unwrap(commands.openapiSyncApply(projectId, upload)),
+    openapiSyncCheck: (projectId, upload, allowedHosts) => unwrap(commands.openapiSyncCheck(projectId, upload, allowedHosts ?? null)),
+    openapiSyncApply: (projectId, upload, allowedHosts) => unwrap(commands.openapiSyncApply(projectId, upload, allowedHosts ?? null)),
     openapiSourceChanged: (projectId) => unwrap(commands.openapiSourceChanged(projectId)),
     operationList: (projectId) => unwrap(commands.operationList(projectId)),
     operationGet: (projectId, opKey) => unwrap(commands.operationGet(projectId, opKey)),
@@ -69,6 +69,48 @@ export function createTauriBackend(): Backend {
     },
     draftSave: (draft) => unwrap(commands.draftSave(draft)),
     draftGet: (projectId, opKey) => unwrap(commands.draftGet(projectId, opKey)),
+
+    projectSettingsSet: (projectId, settings) => unwrap(commands.projectSettingsSet(projectId, settings)),
+    appSettingsGet: () => unwrap(commands.appSettingsGet()),
+    appSettingsSet: (settings) => unwrap(commands.appSettingsSet(settings)),
+    proxyPasswordSet: (password) => unwrap(commands.proxyPasswordSet(password)),
+    clientCertPasswordSet: (id, password) => unwrap(commands.clientCertPasswordSet(id, password)),
+    pickCertFile: async (kind) => {
+      const picked = await open({
+        multiple: false,
+        directory: false,
+        filters:
+          kind === "ca"
+            ? [{ name: "CA 証明書（PEM）", extensions: ["pem", "crt", "cer"] }]
+            : [{ name: "クライアント証明書（PKCS#12・PEM）", extensions: ["p12", "pfx", "pem"] }],
+      });
+      return typeof picked === "string" ? picked : null;
+    },
+
+    historyList: (projectId, query) => unwrap(commands.historyList(projectId, query)),
+    historyGet: (id) => unwrap(commands.historyGet(id)),
+    historyDelete: async (id) => {
+      await unwrap(commands.historyDelete(id));
+    },
+    historyClear: (projectId) => unwrap(commands.historyClear(projectId)),
+    historyOpen: (id) => unwrap(commands.historyOpen(id)),
+    historyResend: (id, settings) => unwrap(commands.historyResend(id, settings)),
+    historySaveAsInput: (id, name) => unwrap(commands.historySaveAsInput(id, name)),
+    historyCurl: (id) => unwrap(commands.historyCurl(id)),
+    historyCompare: (leftId, rightId) => unwrap(commands.historyCompare(leftId, rightId)),
+    curlParse: (projectId, text, environmentId) => unwrap(commands.curlParse(projectId, text, environmentId)),
+    curlExport: (input, mode) => unwrap(commands.curlExport(input, mode)),
+    sessionSave: (projectId, session) => unwrap(commands.sessionSave(projectId, session)),
+    sessionLoad: (projectId) => unwrap(commands.sessionLoad(projectId)),
+
+    updateCheck: () => unwrap(commands.updateCheck()),
+    updatePending: () => commands.updatePending(),
+    updateInstall: async () => {
+      await unwrap(commands.updateInstall());
+    },
+    updateRestart: () => commands.updateRestart(),
+    onUpdateAvailable: (handler) => events.updateAvailable.listen((e) => handler(e.payload.info)),
+    onUpdateProgress: (handler) => events.updateProgress.listen((e) => handler(e.payload)),
 
     pickPaths: async (kind) => {
       const picked =

@@ -12,8 +12,34 @@ pub struct Project {
     pub source: Option<ApiSource>,
     /// 既定の環境の ID（`Environment.id`）。
     pub default_environment_id: Option<String>,
+    /// プロジェクトの設定（cookieAuth・CSRF の自動化のオン・オフ）。
+    #[serde(default)]
+    pub settings: ProjectSettings,
     pub created_at: String,
     pub updated_at: String,
+}
+
+/// プロジェクトの設定。画面の認証タブの 2 つのチェック（既定はどちらもオン）。
+/// どちらも、選んでいる環境があるときだけ働く（値は環境の変数 `session`・`xsrfToken`）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ProjectSettings {
+    /// Cookie `SESSION` の自動化。オンなら、送るときに環境の `session` を Cookie に付け
+    /// （既定の認証が付けない `security: []` の API にも。ログインの 2 段階目に必要）、
+    /// レスポンスの `Set-Cookie: SESSION=…` で環境の `session` を更新する。
+    pub auto_session: bool,
+    /// CSRF の自動化。オンなら、レスポンスの `Set-Cookie: XSRF-TOKEN=…` を環境の `xsrfToken` に保持し、
+    /// 送るときに Cookie `XSRF-TOKEN` と（GET・HEAD・OPTIONS 以外では）`X-XSRF-TOKEN` ヘッダーを付ける。
+    pub auto_csrf: bool,
+}
+
+impl Default for ProjectSettings {
+    fn default() -> Self {
+        Self {
+            auto_session: true,
+            auto_csrf: true,
+        }
+    }
 }
 
 /// OpenAPI の取り込み方法。
@@ -57,7 +83,8 @@ pub struct ApiSource {
     /// URL 方式のアクセストークンをキーチェーンに置いているか（値は返さない）。
     #[serde(default)]
     pub has_token: bool,
-    /// URL 方式で、入口と別のホストの参照を読んでよいと確認したホスト（`host` または `host:port`）。
+    /// URL 方式で、入口と別のホストの参照を読んでよいと確認した origin（`https://assets.example.com`・
+    /// `http://127.0.0.1:8080` の形。`ForeignRef.host` と同じ）。
     #[serde(default)]
     pub allowed_hosts: Vec<String>,
     /// 取り込みのときに選んだ変換オプション。

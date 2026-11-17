@@ -8,4 +8,4 @@
 - 画面と Rust の契約は tauri-specta が生成する `src/bindings.ts`。Rust 側のコマンドや型を変えたら生成し直す。手で書き換えない。
 - UI は日本語のみ。シークレット（session・xsrfToken・password など）はログ・SQLite・履歴に平文で残さない。
 - テストの入力に使う実際の API 定義はコンテナの `/fixtures`（環境変数 NEKOREQ_FIXTURE_DIR / NEKOREQ_FIXTURE_BUNDLED）。無い環境ではスキップする。
-- ブランチは main のみ。
+- ブランチは main が基本。並行作業で worktree を使うときだけ一時ブランチを作り、終わったら main にマージして消す。

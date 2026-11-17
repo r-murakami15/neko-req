@@ -1,0 +1,245 @@
+/* 設定ダイアログ・更新の知らせのスタイル。画面イメージ（docs/screens/Settings.dc.html）の寸法に合わせる。 */
+
+.settings-dialog {
+  display: flex;
+  flex-direction: column;
+  width: min(960px, calc(100% - 32px));
+  max-width: none;
+  height: min(720px, calc(100% - 48px));
+  padding: 0;
+  overflow: hidden;
+  background: var(--bg-dialog);
+}
+.settings-header {
+  display: flex;
+  flex: none;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.settings-loading {
+  margin: var(--space-4) 20px;
+}
+.settings-layout {
+  display: grid;
+  flex: 1 1 auto;
+  grid-template-columns: 200px minmax(0, 1fr);
+  min-height: 0;
+}
+.settings-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 10px;
+  border-right: 1px solid var(--border);
+  background: var(--bg-panel);
+  overflow-y: auto;
+}
+.settings-nav-item {
+  display: flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-sub);
+  text-align: left;
+  cursor: pointer;
+}
+.settings-nav-item:hover {
+  background: var(--bg-field);
+}
+.settings-nav-item.is-active {
+  background: var(--bg-active);
+  color: var(--text-strong);
+}
+.settings-content {
+  padding: 4px 24px 24px;
+  overflow-y: auto;
+}
+.settings-error {
+  margin-top: var(--space-3);
+}
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--border);
+}
+.settings-section:last-child {
+  border-bottom: 0;
+}
+.settings-h {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+.settings-grid {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+}
+.settings-label {
+  color: var(--text-muted);
+}
+.settings-control {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+}
+.settings-inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.settings-hint {
+  max-width: 560px;
+}
+.settings-select {
+  min-width: 120px;
+}
+.settings-switch {
+  width: 18px;
+  height: 18px;
+}
+.settings-radios {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.settings-radio {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.settings-path {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.settings-note {
+  margin: 0;
+}
+.settings-message {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+.settings-ok {
+  color: var(--success);
+}
+.settings-about {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.kbd {
+  padding: 2px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg-field);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.client-certs {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+.client-cert {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.client-cert-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-panel);
+}
+.client-cert-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* ---- 更新の知らせ ---- */
+
+.update-banner {
+  padding: 8px var(--space-4);
+  border-bottom: 1px solid var(--notice-border);
+  background: var(--notice-bg);
+  color: var(--notice-text);
+}
+.update {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.update.is-inline {
+  padding: 10px 12px;
+  border: 1px solid var(--notice-border);
+  border-radius: var(--radius-lg);
+  background: var(--notice-bg);
+  color: var(--notice-text);
+}
+.update-banner .update {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+}
+.update-banner .update-actions,
+.update-banner .update-progress {
+  margin-left: auto;
+}
+/* 更新内容を開いたら、次の行に広げる */
+.update-banner .update-notes[open] {
+  flex: 1 1 100%;
+  order: 3;
+}
+.update-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+.update-title {
+  font-weight: 600;
+}
+.update .muted-note {
+  color: inherit;
+  opacity: 0.85;
+}
+.update-notes {
+  font-size: 12px;
+}
+.update-notes summary {
+  cursor: pointer;
+}
+.update-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.update-progress {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+.update-progress progress {
+  flex: 1 1 160px;
+  max-width: 320px;
+  height: 8px;
+  accent-color: var(--accent);
+}

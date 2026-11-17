@@ -49,9 +49,15 @@ flate2 = "1"
 brotli = "9"
 encoding_rs = "0.8"
 # rustls は ring で使う（aws-lc は C のビルド道具が増えるため）。システムの証明書ストアで検証する
-reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider", "http2"] }
+# system-proxy: macOS・Windows の OS のプロキシ設定と、環境変数（HTTP_PROXY など）を読む（設定の「OS の設定を使う」）
+reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider", "http2", "system-proxy"] }
+# 「OS の設定を使う」プロキシで localhost を直接つなぐために、reqwest が内部で使う設定の読み取り（OS・環境変数）を直接呼ぶ
+hyper-util = { version = "0.1", default-features = false, features = ["client-proxy", "client-proxy-system"] }
+http = "1"
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 rustls-platform-verifier = ">=0.6, <0.8"
+# クライアント証明書の .p12（PKCS#12）の読み込み
+p12-keystore = "0.4"
 tower-layer = "0.3"
 tower-service = "0.3"
 
@@ -68,6 +74,9 @@ specta = { version = "=2.0.0-rc.22", features = ["derive", "serde_json"] }
 specta-typescript = "=0.0.9"
 tauri-specta = { version = "=2.0.0-rc.21", features = ["derive", "typescript"] }
 
+# 履歴の 2 件の比較（行単位の差分）
+similar = "2"
+
 # OpenAPI の取り込み（openapi クレート）。saphyr は位置つきの YAML パーサー
 saphyr = "0.3"
 sha2 = "0.10"
@@ -80,6 +89,8 @@ tauri = { version = "2", features = [] }
 tauri-build = { version = "2", features = [] }
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
+# 自動更新（GitHub Releases の latest.json を確認する）
+tauri-plugin-updater = "2"
 
 [profile.release]
 codegen-units = 1

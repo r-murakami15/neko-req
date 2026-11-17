@@ -20,6 +20,7 @@ tauri-build = { workspace = true }
 
 [dependencies]
 nekoreq-core = { workspace = true }
+nekoreq-curl = { workspace = true }
 nekoreq-http = { workspace = true }
 nekoreq-openapi = { workspace = true }
 nekoreq-secrets = { workspace = true }
@@ -29,15 +30,28 @@ chrono = { workspace = true }
 tauri = { workspace = true }
 tauri-plugin-dialog = { workspace = true }
 tauri-plugin-opener = { workspace = true }
+tauri-plugin-updater = { workspace = true }
 tauri-specta = { workspace = true }
 specta = { workspace = true }
 specta-typescript = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+similar = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
+url = { workspace = true }
 
 [dev-dependencies]
+tauri = { workspace = true, features = ["test"] }
+base64 = { workspace = true }
+chrono = { workspace = true }
+encoding_rs = { workspace = true }
+flate2 = { workspace = true }
+rusqlite = { workspace = true }
+p12-keystore = { workspace = true }
+rcgen = { workspace = true }
+rustls = { workspace = true }
+tokio-rustls = { workspace = true }
 tempfile = { workspace = true }
 uuid = { workspace = true }
 wiremock = { workspace = true }

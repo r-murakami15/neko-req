@@ -44,6 +44,10 @@ pub struct MultipartPart {
     pub name: String,
     pub value: MultipartValue,
     pub enabled: bool,
+    /// このパートの Content-Type（cURL の `-F 'file=@a.png;type=image/png'` の `;type=`）。
+    /// なければ、ファイルはファイル名の拡張子から決め、テキストは付けない。
+    #[serde(default)]
+    pub content_type: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]

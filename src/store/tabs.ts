@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-import type { AdHocRequest, AuthOverride, Body, DefaultAuth, OpKey, OperationOpen, ParamRef, RequestDraft, RequestSpec, SendOutcome } from "../bindings";
+import type { AdHocRequest, AuthOverride, AutoUpdate, AutoUpdateSkip, Body, DefaultAuth, OpKey, OperationOpen, ParamRef, RequestDraft, RequestSpec, SendOutcome } from "../bindings";
 import { opKeyString } from "../lib/opkey";
 import { emptySpec, NEW_REQUEST_NAME, specOfAdhoc } from "../lib/spec";
 
@@ -18,9 +18,27 @@ export interface SendState {
   outcome: SendOutcome | null;
   /** 送ったときに使っていた環境の名前。 */
   envName: string | null;
+  /** 受け取った Set-Cookie で自動更新した変数（`session`・`xsrfToken`）。 */
+  autoUpdates: AutoUpdate[];
+  /** 更新できなかった変数と、その理由。 */
+  autoUpdateSkipped: AutoUpdateSkip[];
 }
 
-export const IDLE_SEND: SendState = { phase: "idle", sendId: null, cancelRequested: false, outcome: null, envName: null };
+export const IDLE_SEND: SendState = {
+  phase: "idle",
+  sendId: null,
+  cancelRequested: false,
+  outcome: null,
+  envName: null,
+  autoUpdates: [],
+  autoUpdateSkipped: [],
+};
+
+/** 開いたとき入力から外した値の案内（履歴から開いた・前回のタブを復元した）。 */
+export interface DroppedNote {
+  source: "history" | "session";
+  fields: string[];
+}
 
 /** yaml の API（OpenAPI の Operation）として開いたタブの、yaml 側の情報。 */
 export interface OpTabInfo {
@@ -61,6 +79,25 @@ export interface RequestTab {
   /** `null` は自動（JSON として読めれば JSON）。 */
   bodyMode: BodyMode | null;
   send: SendState;
+  /** 外した値があるときの案内（閉じるまで出す）。 */
+  droppedNote: DroppedNote | null;
+}
+
+/** タブを作るための材料（履歴・cURL・前回の復元から開くとき）。 */
+export interface TabSeed {
+  name: string;
+  /** いま入っている入力。 */
+  spec: RequestSpec;
+  /** 保存済みの内容（これと違えば「未保存」）。 */
+  baseName?: string;
+  baseSpec?: RequestSpec;
+  adhocId?: string | null;
+  description?: string;
+  op?: OpTabInfo | null;
+  requestPane?: RequestPane;
+  responsePane?: ResponsePane;
+  bodyMode?: BodyMode | null;
+  droppedNote?: DroppedNote | null;
 }
 
 /** キーの順番に左右されない文字列にする（Rust が返す JSON と画面で作った JSON を比べるため）。 */
@@ -124,6 +161,19 @@ function makeTab(
     responsePane: "body",
     bodyMode: null,
     send: IDLE_SEND,
+    droppedNote: null,
+  };
+}
+
+function tabFromSeed(projectId: string, seed: TabSeed): RequestTab {
+  const base = makeTab(projectId, seed.name, seed.spec, seed.adhocId ?? null, seed.description ?? "", seed.op ?? null);
+  return {
+    ...base,
+    baseline: serializeTab(seed.baseName ?? seed.name, seed.baseSpec ?? seed.spec),
+    requestPane: seed.requestPane ?? base.requestPane,
+    responsePane: seed.responsePane ?? base.responsePane,
+    bodyMode: seed.bodyMode === undefined ? base.bodyMode : seed.bodyMode,
+    droppedNote: seed.droppedNote ?? null,
   };
 }
 
@@ -137,8 +187,16 @@ interface TabsState {
   saveDialogTabId: string | null;
   /** 「未保存のまま閉じる？」を確認中のタブ。 */
   closeConfirmTabId: string | null;
+  /** 前回のタブの復元が済んだプロジェクト（済むまでは、タブの状態を保存しない）。 */
+  restored: Record<string, boolean>;
 
   openNew: (projectId: string) => string;
+  /** 入力が入った状態で新しいタブを開く（履歴の「編集して開く」・cURL から作成）。必ず新しいタブにする。 */
+  openSeed: (projectId: string, seed: TabSeed) => string;
+  /** プロジェクトのタブを `seeds` に置き換える（前回の復元）。`activeIndex` のタブを前に出す。 */
+  restoreProject: (projectId: string, seeds: TabSeed[], activeIndex: number | null) => string[];
+  markRestored: (projectId: string) => void;
+  dismissDropped: (tabId: string) => void;
   openAdhoc: (adhoc: AdHocRequest) => string;
   /** yaml の API を開く。同じ API のタブが開いていれば、そのタブを前に出す。 */
   openOp: (projectId: string, opened: OperationOpen) => string;
@@ -166,6 +224,27 @@ export const useTabsStore = create<TabsState>()((set, get) => ({
   activeByProject: {},
   saveDialogTabId: null,
   closeConfirmTabId: null,
+  restored: {},
+
+  openSeed: (projectId, seed) => {
+    const tab = tabFromSeed(projectId, seed);
+    set((s) => ({ tabs: [...s.tabs, tab], activeByProject: { ...s.activeByProject, [projectId]: tab.id } }));
+    return tab.id;
+  },
+
+  restoreProject: (projectId, seeds, activeIndex) => {
+    const made = seeds.map((seed) => tabFromSeed(projectId, seed));
+    set((s) => ({
+      tabs: [...s.tabs.filter((t) => t.projectId !== projectId), ...made],
+      activeByProject: { ...s.activeByProject, [projectId]: activeIndex === null ? made[0]?.id : made[activeIndex]?.id },
+      restored: { ...s.restored, [projectId]: true },
+    }));
+    return made.map((t) => t.id);
+  },
+
+  markRestored: (projectId) => set((s) => ({ restored: { ...s.restored, [projectId]: true } })),
+
+  dismissDropped: (tabId) => set((s) => ({ tabs: mapTab(s.tabs, tabId, (t) => ({ ...t, droppedNote: null })) })),
 
   openNew: (projectId) => {
     const tab = makeTab(projectId, NEW_REQUEST_NAME, emptySpec(), null);
@@ -253,7 +332,7 @@ export const useTabsStore = create<TabsState>()((set, get) => ({
 
   setSend: (tabId, update) => set((s) => ({ tabs: mapTab(s.tabs, tabId, (t) => ({ ...t, send: update(t.send) })) })),
 
-  reset: () => set({ tabs: [], activeByProject: {}, saveDialogTabId: null, closeConfirmTabId: null }),
+  reset: () => set({ tabs: [], activeByProject: {}, saveDialogTabId: null, closeConfirmTabId: null, restored: {} }),
 }));
 
 /** プロジェクトの前面のタブ（なければ先頭）。 */

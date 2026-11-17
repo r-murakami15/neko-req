@@ -227,16 +227,19 @@ fn multipart_body_ignores_a_hand_written_content_type() {
             name: "title".into(),
             value: MultipartValue::Text("{{q}}".into()),
             enabled: true,
+            content_type: None,
         },
         MultipartPart {
             name: "off".into(),
             value: MultipartValue::Text("x".into()),
             enabled: false,
+            content_type: None,
         },
         MultipartPart {
             name: "file".into(),
             value: MultipartValue::File("/tmp/a.txt".into()),
             enabled: true,
+            content_type: None,
         },
     ]);
     let p = build(&s);
@@ -252,7 +255,8 @@ fn multipart_body_ignores_a_hand_written_content_type() {
         parts[0],
         PreparedPart {
             name: "title".into(),
-            value: PreparedPartValue::Text("ネコ & 犬".into())
+            value: PreparedPartValue::Text("ネコ & 犬".into()),
+            content_type: None,
         }
     );
     assert_eq!(parts[1].value, PreparedPartValue::File("/tmp/a.txt".into()));
@@ -391,6 +395,7 @@ fn unresolved_in_form_and_multipart_rows_have_row_numbers() {
         name: "{{n}}".into(),
         value: MultipartValue::Text("v".into()),
         enabled: true,
+        content_type: None,
     }]);
     let BuildError::Unresolved(vars) = build_request(&s, &scope(), &Fixed).unwrap_err() else {
         panic!()

@@ -7,7 +7,11 @@
 //! - シークレット変数の値が現れた箇所は、ヘッダー・URL・ボディのどこでも `••••` にする。
 //!   URL に入るときにパーセントエンコードされた形（16 進は大文字・小文字の両方）、フォームの形（`+`）、
 //!   url クレートが URL を整えたあとの形（パス・クエリ・ホストなど場所ごとのエンコードと、ホストの小文字化）も対象。
+//!   さらに、前後の空白を除いた形（ヘッダーの値は HTTP で前後の空白が落ちる）・JSON の文字列のエスケープ形
+//!   （`\/`・`\"`・`\\`・`\uXXXX`）・base64（標準・URL セーフ、パディングあり・なし）も対象。
+//!   短すぎる値（4 文字未満）からは、前後の空白と base64 の形を作らない（関係のない文字列まで伏せないため）。
 
+use base64::Engine as _;
 use percent_encoding::utf8_percent_encode;
 
 use crate::history::HeaderPair;
@@ -66,8 +70,12 @@ fn mask_cookie_pair(pair: &str) -> String {
     }
 }
 
-/// `text` の中のシークレットの値をすべて `••••` にする。空の値は無視する。
-pub fn redact_text(text: &str, secrets: &[String]) -> String {
+/// 値から作る形（前後の空白を除いた形・base64）を作る最小の文字数。これより短い値は、
+/// 関係のない文字列まで伏せてしまうので、そのままの形と URL・JSON の形だけを探す。
+const MIN_DERIVED_CHARS: usize = 4;
+
+/// 探す文字列（長いものが先）。空・重複は除く。
+fn needles_of(secrets: &[String]) -> Vec<String> {
     let mut needles: Vec<String> = Vec::new();
     for secret in secrets.iter().filter(|s| !s.is_empty()) {
         for variant in secret_variants(secret) {
@@ -78,6 +86,12 @@ pub fn redact_text(text: &str, secrets: &[String]) -> String {
     }
     // 長いものから置き換える（短い値が長い値の一部になっていても取り残さない）
     needles.sort_by_key(|n| std::cmp::Reverse(n.len()));
+    needles
+}
+
+/// `text` の中のシークレットの値をすべて `••••` にする。空の値は無視する。
+pub fn redact_text(text: &str, secrets: &[String]) -> String {
+    let needles = needles_of(secrets);
     let mut out = text.to_string();
     for needle in &needles {
         if out.contains(needle.as_str()) {
@@ -87,8 +101,47 @@ pub fn redact_text(text: &str, secrets: &[String]) -> String {
     out
 }
 
-/// シークレットが URL・フォームに入ったときの形も含めた、探す文字列。
+/// 途中で切れたテキスト（表示上限で切ったもの）の末尾に、シークレットの先頭の断片が残らないようにする。
+/// `text` は `redact_text` で伏せたあとのもの。末尾が、どれかのシークレット（の探す形）の先頭の一部と
+/// 一致していたら、その部分を落とす（切り口をまたぐシークレットの前半を残さない）。
+pub fn drop_partial_secret_tail(text: &str, secrets: &[String]) -> String {
+    let mut cut = text.len();
+    for needle in needles_of(secrets) {
+        // 先頭から 1 文字ずつ長くした断片が末尾と一致するか（長い方を優先）。完全一致は伏せ済みなので `<` まで。
+        let ends: Vec<usize> = needle.char_indices().map(|(i, _)| i).skip(1).collect();
+        for &end in ends.iter().rev() {
+            let frag = &needle[..end];
+            if text.ends_with(frag) {
+                cut = cut.min(text.len() - frag.len());
+                break;
+            }
+        }
+    }
+    text[..cut].to_string()
+}
+
+/// シークレットが URL・フォーム・JSON・base64 などに入ったときの形も含めた、探す文字列。
 fn secret_variants(secret: &str) -> Vec<String> {
+    let mut bases = vec![secret];
+    // ヘッダーの値は HTTP で前後の空白が落ちる（コピー & ペーストで付いた空白つきの値を、サーバーは空白なしでエコーする）
+    let trimmed = secret.trim();
+    if trimmed != secret && trimmed.chars().count() >= MIN_DERIVED_CHARS {
+        bases.push(trimmed);
+    }
+    let mut v: Vec<String> = Vec::new();
+    for base in bases {
+        v.extend(url_forms(base));
+        v.extend(json_forms(base));
+        if base.chars().count() >= MIN_DERIVED_CHARS {
+            v.extend(base64_forms(base));
+        }
+    }
+    v.retain(|x| !x.is_empty());
+    v
+}
+
+/// URL・フォームに入ったときの形。
+fn url_forms(secret: &str) -> Vec<String> {
     let mut v = vec![
         secret.to_string(),
         utf8_percent_encode(secret, QUERY_COMPONENT).to_string(),
@@ -105,8 +158,75 @@ fn secret_variants(secret: &str) -> Vec<String> {
         .map(|x| lowercase_hex(x))
         .collect();
     v.extend(lower);
-    v.retain(|x| !x.is_empty());
     v
+}
+
+/// base64（標準・URL セーフ、パディングあり・なし）にした形。
+fn base64_forms(secret: &str) -> Vec<String> {
+    use base64::engine::general_purpose::{STANDARD, STANDARD_NO_PAD, URL_SAFE, URL_SAFE_NO_PAD};
+    [STANDARD, STANDARD_NO_PAD, URL_SAFE, URL_SAFE_NO_PAD]
+        .iter()
+        .map(|e| e.encode(secret.as_bytes()))
+        .collect()
+}
+
+/// JSON の文字列に入ったときの形（`"` と `\` のエスケープ、`/` を `\/` にする言語、非 ASCII だけ・すべてを
+/// `\uXXXX`（UTF-16 の単位ごと。16 進は小文字・大文字）にする言語）。元の文字列と同じ形は返さない。
+fn json_forms(secret: &str) -> Vec<String> {
+    #[derive(Clone, Copy, PartialEq)]
+    enum Unicode {
+        Off,
+        NonAscii,
+        All,
+    }
+    let mut out: Vec<String> = Vec::new();
+    for slash in [false, true] {
+        for unicode in [Unicode::Off, Unicode::NonAscii, Unicode::All] {
+            for upper in [false, true] {
+                if upper && unicode == Unicode::Off {
+                    continue;
+                }
+                let mut s = String::with_capacity(secret.len() + 8);
+                for c in secret.chars() {
+                    let standard = match c {
+                        '"' => Some("\\\""),
+                        '\\' => Some("\\\\"),
+                        '/' if slash => Some("\\/"),
+                        '\n' => Some("\\n"),
+                        '\r' => Some("\\r"),
+                        '\t' => Some("\\t"),
+                        _ => None,
+                    };
+                    let as_unicode = match unicode {
+                        Unicode::All => true,
+                        Unicode::NonAscii => {
+                            !c.is_ascii() || (c.is_control() && standard.is_none())
+                        }
+                        Unicode::Off => c.is_control() && standard.is_none(),
+                    };
+                    if as_unicode {
+                        let mut buf = [0u16; 2];
+                        for unit in c.encode_utf16(&mut buf) {
+                            let unit = *unit;
+                            if upper {
+                                s.push_str(&format!("\\u{unit:04X}"));
+                            } else {
+                                s.push_str(&format!("\\u{unit:04x}"));
+                            }
+                        }
+                    } else if let Some(e) = standard {
+                        s.push_str(e);
+                    } else {
+                        s.push(c);
+                    }
+                }
+                if s != secret && !out.contains(&s) {
+                    out.push(s);
+                }
+            }
+        }
+    }
+    out
 }
 
 /// url クレートが URL を整えたあとにシークレットがとる形。URL の各場所
@@ -164,12 +284,13 @@ fn lowercase_hex(s: &str) -> String {
     out
 }
 
-/// ヘッダーの一覧を伏せ字にする（順番と重複は保つ）。
+/// ヘッダーの一覧を伏せ字にする（順番と重複は保つ）。値のほかに、名前に入ったシークレットも伏せる
+/// （`X-{{token}}` のようなヘッダー名）。
 pub fn redact_headers(headers: &[HeaderPair], secrets: &[String]) -> Vec<HeaderPair> {
     headers
         .iter()
         .map(|h| HeaderPair {
-            name: h.name.clone(),
+            name: redact_text(&h.name, secrets),
             value: redact_text(&redact_header_value(&h.name, &h.value), secrets),
         })
         .collect()
@@ -285,6 +406,46 @@ mod tests {
     fn longer_secret_wins_over_its_prefix() {
         let secrets = vec!["abc".to_string(), "abcdef".to_string()];
         assert_eq!(redact_text("x abcdef y", &secrets), "x •••• y");
+    }
+
+    #[test]
+    fn trimmed_json_escaped_and_base64_forms_are_masked() {
+        // 前後の空白つきのシークレットは、空白なしの形も伏せる
+        let padded = vec!["  PAD-SECRET-1  ".to_string()];
+        assert_eq!(redact_text("v=PAD-SECRET-1;", &padded), "v=••••;");
+        // JSON のエスケープ形
+        let secrets = vec!["a/b\"c\\d".to_string(), "ねこ-SECRET".to_string()];
+        assert_eq!(
+            redact_text(r#"{"x":"a\/b\"c\\d","y":"\u306d\u3053-SECRET"}"#, &secrets),
+            r#"{"x":"••••","y":"••••"}"#
+        );
+        assert_eq!(
+            redact_text(r#"{"y":"ねこ-SECRET","z":"\u306D\u3053-SECRET"}"#, &secrets),
+            r#"{"y":"••••","z":"••••"}"#
+        );
+        // base64（標準・URL セーフ、パディングあり・なし）
+        let b = vec!["abc???>>>".to_string()];
+        for form in ["YWJjPz8/Pj4+", "YWJjPz8_Pj4-"] {
+            assert_eq!(redact_text(&format!("t={form}"), &b), "t=••••", "{form}");
+        }
+        let b = vec!["abcd".to_string()];
+        for form in ["YWJjZA==", "YWJjZA"] {
+            assert_eq!(redact_text(&format!("t={form}"), &b), "t=••••", "{form}");
+        }
+        // 短い値（4 文字未満）は base64 の形を探さない
+        assert_eq!(redact_text("YWI= x", &["ab".to_string()]), "YWI= x");
+        // ヘッダー名も伏せる
+        let out = redact_headers(&[h("X-NAMESECRET", "1")], &["NAMESECRET".to_string()]);
+        assert_eq!(out[0].name, "X-••••");
+    }
+
+    #[test]
+    fn a_secret_fragment_at_the_cut_is_dropped() {
+        let secrets = vec!["TEN-SECRET-0123".to_string()];
+        assert_eq!(drop_partial_secret_tail("abc TEN-SEC", &secrets), "abc ");
+        assert_eq!(drop_partial_secret_tail("abc T", &secrets), "abc ");
+        assert_eq!(drop_partial_secret_tail("abc ••••", &secrets), "abc ••••");
+        assert_eq!(drop_partial_secret_tail("abc xyz", &secrets), "abc xyz");
     }
 
     #[test]

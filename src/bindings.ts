@@ -232,21 +232,23 @@ async openapiImport(request: ImportRequest) : Promise<Result<ImportResult, AppEr
 /**
  * 同期ボタン: yaml を読み直して、前回との差分（追加・変更・削除）を返す。何も反映しない。
  * コピー方式のときは `upload`（もう一度選んだファイル）が要る（なければ `needsUpload`）。
+ * 別ホストの参照で `needsConfirmation` が返ったら、確認した origin（`foreign[].host`）を `allowedHosts` に
+ * 入れて呼び直す（確認したホストは取り込み元に保存され、以後は確認しない）。
  */
-async openapiSyncCheck(projectId: string, upload: UploadInput | null) : Promise<Result<SyncCheckResult, AppError>> {
+async openapiSyncCheck(projectId: string, upload: UploadInput | null, allowedHosts: string[] | null) : Promise<Result<SyncCheckResult, AppError>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("openapi_sync_check", { projectId, upload }) };
+    return { status: "ok", data: await TAURI_INVOKE("openapi_sync_check", { projectId, upload, allowedHosts }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
 },
 /**
- * 同期を反映する。入力値（RequestDraft）は消さない。
+ * 同期を反映する。入力値（RequestDraft）は消さない。`allowedHosts` は `openapi_sync_check` と同じ。
  */
-async openapiSyncApply(projectId: string, upload: UploadInput | null) : Promise<Result<SyncApplyResult, AppError>> {
+async openapiSyncApply(projectId: string, upload: UploadInput | null, allowedHosts: string[] | null) : Promise<Result<SyncApplyResult, AppError>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("openapi_sync_apply", { projectId, upload }) };
+    return { status: "ok", data: await TAURI_INVOKE("openapi_sync_apply", { projectId, upload, allowedHosts }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -320,8 +322,9 @@ async sourceTokenSet(projectId: string, token: string) : Promise<Result<Project,
 }
 },
 /**
- * 取り込んだ yaml を OS の既定のアプリで開く。`file` は `Operation.sourceFile`（入口からの相対パス）。
- * 行番号は既定のアプリに渡せないので、いまは使わない（OS の既定のアプリが開くだけ）。
+ * 取り込んだ yaml をエディタで開く。`file` は `Operation.sourceFile`（入口からの相対パス）、`line` は行番号。
+ * 設定のコマンド（`AppSettings.editorCommand`）か、VS Code・Cursor・Sublime・JetBrains の順に見つかったエディタで
+ * 行番号まで開く。どれもなければ OS の既定のアプリで開く（行番号は渡せない）。
  */
 async editorOpen(projectId: string, file: string, line: number | null) : Promise<Result<null, AppError>> {
     try {
@@ -330,6 +333,241 @@ async editorOpen(projectId: string, file: string, line: number | null) : Promise
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+/**
+ * プロジェクトの設定（cookieAuth・CSRF の自動化のオン・オフ）を保存する。更新後のプロジェクトを返す。
+ */
+async projectSettingsSet(projectId: string, settings: ProjectSettings) : Promise<Result<Project, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("project_settings_set", { projectId, settings }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * アプリ全体の設定（外観・リクエスト・プロキシと証明書・履歴・エディタのコマンド）。
+ */
+async appSettingsGet() : Promise<Result<AppSettings, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("app_settings_get") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * アプリ全体の設定を保存する。保存した内容（整えたもの）を返す。
+ */
+async appSettingsSet(settings: AppSettings) : Promise<Result<AppSettings, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("app_settings_set", { settings }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * 手動のプロキシのパスワードをキーチェーンに保存する（空なら消す）。更新後の設定を返す。
+ */
+async proxyPasswordSet(password: string) : Promise<Result<AppSettings, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("proxy_password_set", { password }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * クライアント証明書（`id`。先に `app_settings_set` で設定に入れておく）のパスワードをキーチェーンに保存する
+ * （空なら消す）。更新後の設定を返す。
+ */
+async clientCertPasswordSet(id: string, password: string) : Promise<Result<AppSettings, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("client_cert_password_set", { id, password }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * 履歴の一覧（新しい順）。ステータス・環境・期間で絞り込み、URL とボディを全文検索できる。続きは `nextCursor`。
+ */
+async historyList(projectId: string, query: HistoryQuery) : Promise<Result<HistoryPage, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("history_list", { projectId, query }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * 履歴 1 件（送った内容・受け取った内容・時間・元の入力）。
+ */
+async historyGet(id: string) : Promise<Result<HistoryEntry, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("history_get", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async historyDelete(id: string) : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("history_delete", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * プロジェクトの履歴をすべて消す。消した件数を返す。
+ */
+async historyClear(projectId: string) : Promise<Result<number, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("history_clear", { projectId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * 編集して開く: 送信に使った元の入力（`{{変数}}` のまま）を返す。
+ */
+async historyOpen(id: string) : Promise<Result<HistoryOpen, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("history_open", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * 再送信: 元の入力を今の環境で送り直す。`request_send` と同じく送信 ID をすぐ返し、結果は
+ * `request://finished` で届く（新しい履歴も残る）。
+ */
+async historyResend(id: string, settings: SendSettings | null) : Promise<Result<string, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("history_resend", { id, settings }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * 入力値として保存: yaml の API なら入力値（RequestDraft）に、手で作ったものなら「その他」のリクエスト
+ * （AdHocRequest。`name` がなければ `METHOD /path`）として保存する。
+ */
+async historySaveAsInput(id: string, name: string | null) : Promise<Result<SavedInput, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("history_save_as_input", { id, name }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * 履歴の送った内容（伏せ字済み）を cURL コマンドにする。
+ */
+async historyCurl(id: string) : Promise<Result<string, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("history_curl", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * 2 件のレスポンスの差分（ステータス・ヘッダー・ボディの行単位。JSON は整形してから比べる）。
+ */
+async historyCompare(leftId: string, rightId: string) : Promise<Result<HistoryDiff, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("history_compare", { leftId, rightId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * cURL を取り込む（何も保存しない）。環境の `baseUrl` と同じホストなら `{{baseUrl}}` に置き換え、
+ * method と path が yaml の API に当てはまればその API の入力値として、なければ「その他」のリクエストとして返す。
+ */
+async curlParse(projectId: string, text: string, environmentId: string | null) : Promise<Result<CurlImport, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("curl_parse", { projectId, text, environmentId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * 今の入力を展開して cURL にする。`mode` は「シークレットを伏せる（既定）」か「そのまま」。
+ */
+async curlExport(input: RequestInput, mode: CurlExportMode) : Promise<Result<string, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("curl_export", { input, mode }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * 開いているタブと未保存の入力・選んでいるタブを保存する（置き換え）。手で書いた認証の値は空にして保存する
+ * （保存した内容を返す。`droppedFields` に空にしたものの名前が入る）。
+ */
+async sessionSave(projectId: string, session: SessionState) : Promise<Result<SessionState, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("session_save", { projectId, session }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * 前回のタブの状態。保存がなければ `null`。
+ */
+async sessionLoad(projectId: string) : Promise<Result<SessionState | null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("session_load", { projectId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * 更新を今すぐ確認する。新しい版があればその情報、なければ `None`。
+ */
+async updateCheck() : Promise<Result<UpdateInfo | null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("update_check") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * 起動時の確認で見つかっていて、まだ入れ替えていない更新（イベントを取りこぼしたときの取り出し用）。
+ */
+async updatePending() : Promise<UpdateInfo | null> {
+    return await TAURI_INVOKE("update_pending");
+},
+/**
+ * 見つかっている更新をダウンロードして入れ替える。進捗は `update://progress`。
+ * 入れ替えたあと、再起動するまでは今の版のまま動く（再起動は `update_restart`）。
+ */
+async updateInstall() : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("update_install") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * アプリを再起動する（更新を入れ替えたあとに、画面が呼ぶ）。
+ */
+async updateRestart() : Promise<void> {
+    await TAURI_INVOKE("update_restart");
 }
 }
 
@@ -337,9 +575,13 @@ async editorOpen(projectId: string, file: string, line: number | null) : Promise
 
 
 export const events = __makeEvents__<{
-requestFinished: RequestFinished
+requestFinished: RequestFinished,
+updateAvailable: UpdateAvailable,
+updateProgress: UpdateProgress
 }>({
-requestFinished: "request://finished"
+requestFinished: "request://finished",
+updateAvailable: "update://available",
+updateProgress: "update://progress"
 })
 
 /** user-defined constants **/
@@ -389,7 +631,8 @@ syncedAt: string | null;
  */
 hasToken?: boolean; 
 /**
- * URL 方式で、入口と別のホストの参照を読んでよいと確認したホスト（`host` または `host:port`）。
+ * URL 方式で、入口と別のホストの参照を読んでよいと確認した origin（`https://assets.example.com`・
+ * `http://127.0.0.1:8080` の形。`ForeignRef.host` と同じ）。
  */
 allowedHosts?: string[]; 
 /**
@@ -423,11 +666,37 @@ export type AppError =
 /**
  * ファイルの書き込みなどのエラー。
  */
-{ kind: "io"; message: string }
+{ kind: "io"; message: string } | 
+/**
+ * 更新の確認・入れ替えのエラー（ネットワーク・署名の検証など）。
+ */
+{ kind: "update"; message: string }
 /**
  * アプリの情報（版・データの場所など）。
  */
 export type AppInfo = { name: string; version: string; identifier: string; dataDir: string; dbPath: string; schemaVersion: number }
+/**
+ * アプリの設定。保存は storage の `app_settings`。足りない項目は既定値で読む。
+ */
+export type AppSettings = { 
+/**
+ * yaml を開くエディタのコマンド（空・未設定なら、VS Code・Cursor・Sublime・JetBrains の順に見つかったもの）。
+ * シェルを通さず、空白で区切って（`"` `'` で囲める）起動する。`{file}` は絶対パス、`{line}` は行番号
+ * （行番号がなければ 1）に置き換える。例: `code -g {file}:{line}`
+ */
+editorCommand: string | null; appearance: AppearanceSettings; request: RequestSettings; network: NetworkSettings; history: HistorySettings }
+/**
+ * 外観。
+ */
+export type AppearanceSettings = { theme: Theme; 
+/**
+ * エディタの文字サイズ（px。13・14・15）。
+ */
+editorFontSize: number; 
+/**
+ * 起動時に前回のタブを復元する（`session_load` の結果を使うか。保存は常にする）。
+ */
+restoreTabs: boolean }
 /**
  * 認証の上書き。`RequestDraft.auth = None` のときは Operation の security に従う。
  * 
@@ -444,9 +713,42 @@ export type AuthOverride =
  */
 export type AutoHeader = { name: string; value: string; 
 /**
- * 付く理由（「認証」「ボディ」「アプリ既定」「URL から」）。
+ * 付く理由（「認証（Bearer）」「認証タブ（cookieAuth）」「CSRF の自動付与」「Cookie」「ボディ」「アプリ既定」
+ * 「URL から」など。Cookie は複数の出どころを「、」でつなぐ）。
  */
 source: string }
+/**
+ * 送信のあとに自動で更新した環境変数 1 件（値は出さない）。画面で「session を更新しました」と出す。
+ */
+export type AutoUpdate = { 
+/**
+ * 変数名（`session` / `xsrfToken`）。
+ */
+name: string; environmentId: string; environmentName: string; action: AutoUpdateAction }
+/**
+ * 自動更新の種類。
+ */
+export type AutoUpdateAction = 
+/**
+ * 値を更新した（なければシークレットとして作った）。
+ */
+"updated" | 
+/**
+ * サーバーに消されたので値を消した。
+ */
+"cleared"
+/**
+ * 自動更新できなかったもの（キーチェーンに書けないなど）。送信自体は成功している。
+ */
+export type AutoUpdateSkip = { 
+/**
+ * 変数名（`session` / `xsrfToken`）。
+ */
+name: string; 
+/**
+ * 画面にそのまま出せる理由。値は含まない。
+ */
+reason: string }
 /**
  * リクエストボディ。
  */
@@ -482,6 +784,26 @@ export type ChangedField = "summary" | "description" | "parameters" | "requestBo
  */
 "operationId"
 /**
+ * クライアント証明書 1 件（ホストのパターン → ファイル）。
+ */
+export type ClientCertSetting = { 
+/**
+ * 空なら保存のときに付ける。パスワード（キーチェーン）の置き場所の名前に使う。
+ */
+id: string; 
+/**
+ * 使うホストのパターン（`*.internal.example`・`api.example.com`・`host:8443`）。
+ */
+hostPattern: string; 
+/**
+ * .p12 / .pfx / .pem ファイルのパス（PEM は証明書と秘密鍵を同じファイルに並べたもの）。
+ */
+path: string; 
+/**
+ * パスワードがキーチェーンにある（読み取り専用。保存のときは無視する）。
+ */
+hasPassword: boolean }
+/**
  * 接続の情報。
  */
 export type ConnectionInfo = { 
@@ -498,6 +820,80 @@ httpVersion: string;
  */
 tls: boolean }
 /**
+ * `curl_export` の伏せ方。
+ */
+export type CurlExportMode = 
+/**
+ * シークレットを伏せる（既定）。`Authorization`・`Cookie`・`X-XSRF-TOKEN` などの値と、
+ * シークレット変数の値が現れた箇所を `••••` にする。
+ */
+"redacted" | 
+/**
+ * そのまま（実際の値が入る。貼り付けて動く）。
+ */
+"raw"
+/**
+ * `curl_parse` の結果。何も保存しない（画面が新しいタブで開く）。
+ */
+export type CurlImport = { target: CurlTarget; 
+/**
+ * `target` が `operation` のときの API のキー。
+ */
+opKey: OpKey | null; 
+/**
+ * API の summary（タブの見出し）。
+ */
+summary: string | null; 
+/**
+ * 当てはまった API の path テンプレート（`/api/v1/video/clients/{clientId}`）。
+ */
+matchedPath: string | null; 
+/**
+ * 開くリクエスト。`operation` のときは、`url` が `{{baseUrl}}` + path テンプレートで、path パラメータは
+ * `params`（`location: path`）に当てはまった値が入っている（yaml のほかのパラメータは無効の行で並ぶ）。
+ */
+request: RequestSpec; 
+/**
+ * `{{baseUrl}}` に置き換えたか。
+ */
+baseReplaced: boolean; 
+/**
+ * ホストが当てはまった環境（`baseUrl` が同じ環境。画面はこの環境を選ぶよう案内できる）。
+ */
+environmentId: string | null; 
+/**
+ * `adhoc` のときの名前の案（`POST /api/v1/auth/password-login`）。
+ */
+suggestedName: string; 
+/**
+ * 無視したオプションなど（取り込めなかった指定）。
+ */
+warnings: CurlWarning[] }
+/**
+ * 取り込んだ cURL の行き先。
+ */
+export type CurlTarget = 
+/**
+ * yaml の API（`op_key`）の入力値として開く。
+ */
+"operation" | 
+/**
+ * 手で作ったリクエスト（「その他」）として開く。
+ */
+"adhoc"
+/**
+ * 取り込めたが注意が要ること。
+ */
+export type CurlWarning = { kind: WarningKind; 
+/**
+ * 該当するオプション（`-k`、`--compressed` など。特定のオプションがないときは空）。
+ */
+option: string; 
+/**
+ * 画面にそのまま出せる説明。
+ */
+message: string }
+/**
  * yaml の security から決まる既定の認証（表示用）。
  */
 export type DefaultAuth = { type: "apiKey"; scheme: string; location: ApiKeyIn; name: string; variable: string } | { type: "bearer"; scheme: string; variable: string } | { type: "basic"; scheme: string; usernameVariable: string; passwordVariable: string }
@@ -509,6 +905,34 @@ export type DiffEntry = { opKey: OpKey; operationId: string | null; method: stri
  * この API の入力値（RequestDraft）があるか。
  */
 hasDraft: boolean }
+/**
+ * 差分の 1 行。
+ */
+export type DiffLine = { tag: DiffTag; text: string; 
+/**
+ * 左の行番号（1 始まり）。
+ */
+leftLine: number | null; 
+/**
+ * 右の行番号（1 始まり）。
+ */
+rightLine: number | null }
+/**
+ * 差分の 1 行の種類。
+ */
+export type DiffTag = "equal" | 
+/**
+ * 左にだけある行。
+ */
+"delete" | 
+/**
+ * 右にだけある行。
+ */
+"insert" | 
+/**
+ * 変わらない行が続くので省いた（`text` に「N 行省略」）。
+ */
+"skip"
 export type DuplicateOperationId = { operationId: string; 
 /**
  * `GET /path` の形。
@@ -565,7 +989,8 @@ before: string | null; after: string | null }
  */
 export type ForeignRef = { 
 /**
- * `host` または `host:port`。確認したら `allowedHosts` に入れて読み直す。
+ * 参照先の origin（`https://assets.example.com`・`http://127.0.0.1:8080` の形。スキーム・ホスト（小文字）・
+ * 既定でないポート。既定のポートは省く）。確認したら `allowedHosts` に入れて読み直す。
  */
 host: string; url: string; referencedFrom: RefSite }
 /**
@@ -573,27 +998,104 @@ host: string; url: string; referencedFrom: RefSite }
  */
 export type HeaderPair = { name: string; value: string }
 /**
- * 履歴 1 件。保存する前にシークレットは `••••` に置き換え済みであること。
+ * 送ったボディの種類。
+ */
+export type HistoryBodyKind = "none" | 
+/**
+ * テキスト（`request_body` に入っている）。
+ */
+"text" | 
+/**
+ * テキストではないバイト列（中身は保存しない。大きさだけ）。
+ */
+"binary" | 
+/**
+ * ファイルをそのまま送った（パスを `request_file` に持つ。中身は保存しない）。
+ */
+"file" | 
+/**
+ * multipart（パートは `request_parts`）。
+ */
+"multipart"
+/**
+ * 2 件の比較。左右は `history_compare` に渡した順。
+ */
+export type HistoryDiff = { left: HistoryListItem; right: HistoryListItem; 
+/**
+ * ステータス（`200 OK` / `失敗: …`）。
+ */
+leftStatus: string; rightStatus: string; statusChanged: boolean; 
+/**
+ * ヘッダー（名前順にそろえた `name: value` の行の差分）。
+ */
+headers: DiffLine[]; headersChanged: boolean; 
+/**
+ * ボディの行の差分。JSON は整形してから比べる。バイナリは比べない（`body_note`）。
+ */
+body: DiffLine[]; bodyChanged: boolean; 
+/**
+ * ボディについての注意（「JSON として整形して比べました」「バイナリのため比べません」「長いため先頭だけ比べました」）。
+ */
+bodyNote: string | null }
+/**
+ * 履歴 1 件。
  */
 export type HistoryEntry = { id: string; projectId: string; 
 /**
- * 送信した日時（RFC 3339）。
+ * 送信した日時（UTC の RFC 3339）。
  */
 sentAt: string; environmentId: string | null; 
 /**
  * 環境を後から消しても履歴で分かるように名前も持つ。
  */
-environmentName: string | null; opKey: OpKey | null; method: string; 
+environmentName: string | null; opKey: OpKey | null; 
+/**
+ * Operation の summary（一覧の見出し。手で作ったリクエストは `None`）。
+ */
+opSummary: string | null; method: string; 
 /**
  * 変数を展開した後の URL（伏せ字済み）。
  */
-url: string; requestHeaders: HeaderPair[]; requestBody: string | null; 
+url: string; 
+/**
+ * リダイレクトを追ったあとの最終的な URL（伏せ字済み。追わなかった・失敗したときは `None`）。
+ */
+finalUrl: string | null; 
+/**
+ * 実際に送ったヘッダー（アプリが付けた User-Agent などを含む。伏せ字済み）。
+ */
+requestHeaders: HeaderPair[]; 
+/**
+ * 送ったボディのテキスト（伏せ字済み）。multipart は、テキストのパートを `name=value` の行にしたもの
+ * （検索と簡単な表示用）。
+ */
+requestBody: string | null; requestBodyKind: HistoryBodyKind; 
+/**
+ * 送ったボディの大きさ（バイト）。
+ */
+requestBodySize: number; 
+/**
+ * 上限（1 MB）を超えて先頭だけ保存したとき `true`。
+ */
+requestBodyTruncated: boolean; requestParts: HistoryPart[]; 
+/**
+ * ボディをファイルから送ったときのパス。
+ */
+requestFile: string | null; 
 /**
  * 通信エラーなどで応答がなかったときは `None`。
  */
-status: number | null; statusText: string | null; responseHeaders: HeaderPair[]; responseBody: string | null; 
+status: number | null; statusText: string | null; responseHeaders: HeaderPair[]; responseContentType: string | null; 
 /**
- * 1 MB を超えて先頭だけ保存したとき `true`。
+ * 受け取ったボディのテキスト（伏せ字済み）。バイナリは保存しない（`response_binary`）。
+ */
+responseBody: string | null; 
+/**
+ * ボディがバイナリだったので保存していない。
+ */
+responseBinary: boolean; 
+/**
+ * 1 MB を超えて先頭だけ保存したとき `true`（画面の 10 MB の上限で切れていたときも `true`）。
  */
 responseBodyTruncated: boolean; 
 /**
@@ -601,9 +1103,140 @@ responseBodyTruncated: boolean;
  */
 responseSize: number; timing: Timing | null; 
 /**
- * 送信に失敗したときのメッセージ。
+ * 送信に失敗したときのメッセージ（伏せ字済み）。
  */
-error: string | null }
+error: string | null; 
+/**
+ * 失敗の種類（`connect`・`tls`・`timeout`・`cancelled`・`tooLarge`・`other`）。
+ */
+errorKind: string | null; 
+/**
+ * 送信に使った元の入力（`{{変数}}` のまま）。再送信・編集して開く・入力値として保存に使う。
+ * 手で書いた認証の値などは `••••` に置き換えてある（`masked_fields`）。
+ */
+input: RequestSpec | null; 
+/**
+ * `input` で伏せたもの（「Authorization ヘッダー」「認証（Bearer のトークン）」など）。空なら伏せていない。
+ */
+maskedFields: string[]; 
+/**
+ * 送信のときに指定されていた変数の上書きの名前（値は保存しない。再送信では使えない）。
+ */
+overrideNames: string[] }
+/**
+ * 一覧用の軽い項目。
+ */
+export type HistoryListItem = { id: string; sentAt: string; 
+/**
+ * ローカルの日付（`2026-11-17`）。画面の日付ごとの区切りに使う。
+ */
+localDate: string; method: string; 
+/**
+ * 展開後の URL（伏せ字済み）。
+ */
+url: string; status: number | null; statusText: string | null; 
+/**
+ * 合計時間（ミリ秒）。失敗で測れなかったときは `None`。
+ */
+totalMs: number | null; environmentId: string | null; environmentName: string | null; opKey: OpKey | null; opSummary: string | null; 
+/**
+ * 失敗（応答がなかった）。
+ */
+failed: boolean; errorKind: string | null; responseSize: number }
+/**
+ * 「編集して開く」で返す、元の入力。
+ */
+export type HistoryOpen = { 
+/**
+ * yaml の API なら、そのキー（新しいタブでその API を開き、`request` を未保存の入力として入れる）。
+ * `None` なら、手で作ったリクエストとして新しいタブで開く。
+ */
+opKey: OpKey | null; summary: string | null; 
+/**
+ * 送信に使った元の入力。`••••` に伏せた認証・ヘッダー・Cookie は外してある。
+ */
+request: RequestSpec; 
+/**
+ * 送信したときの環境（今は使わない。表示用）。
+ */
+environmentId: string | null; environmentName: string | null; 
+/**
+ * 外したもの（「認証（Bearer のトークン）」など）。画面は「手で入力した認証の値は保存していないので、入れ直してください」と出す。
+ */
+droppedFields: string[]; 
+/**
+ * 送信のときにあった変数の上書きの名前（値は保存していない。必要なら入れ直す）。
+ */
+overrideNames: string[] }
+/**
+ * 一覧 1 ページ。
+ */
+export type HistoryPage = { items: HistoryListItem[]; 
+/**
+ * 絞り込みに当てはまる全件数（ページに関係なく）。
+ */
+total: number; 
+/**
+ * 続きがあれば、次のページを取るためのカーソル。
+ */
+nextCursor: string | null }
+/**
+ * multipart の 1 パート（履歴用。値は伏せ字済み）。
+ */
+export type HistoryPart = { name: string; 
+/**
+ * ファイルのパートか（`value` はパス）。
+ */
+isFile: boolean; 
+/**
+ * テキストの値、またはファイルのパス。
+ */
+value: string; contentType: string | null }
+/**
+ * 一覧の絞り込みとページング。
+ */
+export type HistoryQuery = { 
+/**
+ * URL とボディの全文検索（3 文字以上は FTS5 の trigram、それ未満は部分一致）。空なら絞らない。
+ */
+text?: string | null; 
+/**
+ * 空なら絞らない。複数あれば、どれかに当てはまるもの。
+ */
+statuses?: StatusClass[]; environmentId?: string | null; 
+/**
+ * 期間の始め（ローカルの日付 `YYYY-MM-DD`。その日を含む）。
+ */
+from?: string | null; 
+/**
+ * 期間の終わり（ローカルの日付。その日を含む）。
+ */
+to?: string | null; 
+/**
+ * 日付の区切りに使う UTC との差（分。日本は 540）。画面が `-new Date().getTimezoneOffset()` で渡す。
+ * 指定がなければ OS のタイムゾーン。
+ */
+utcOffsetMinutes?: number | null; 
+/**
+ * 1 回に返す件数（既定 100、最大 500）。
+ */
+limit?: number | null; 
+/**
+ * 前のページの `nextCursor`。
+ */
+cursor?: string | null }
+/**
+ * 履歴の設定。
+ */
+export type HistorySettings = { 
+/**
+ * 保存する件数（プロジェクトごと）。`1000`・`5000`・`0`（保存しない）。
+ */
+limit: number; 
+/**
+ * 1 MB を超えるボディを先頭だけ保存する（オフなら全体を保存する）。
+ */
+omitLargeBodies: boolean }
 /**
  * 取り込みの変換オプション（画面「OpenAPI 取り込み」の 4 つのチェック）。既定はすべて入。
  */
@@ -725,9 +1358,13 @@ export type MediaDoc = { contentType: string;
  */
 schemaLabel: string | null; rows: SchemaRow[]; 
 /**
- * 表示する例（yaml の example があればそれ、なければ生成したもの）。
+ * 表示する例（yaml の example があればその最初のもの、なければ生成したもの）。
  */
 example: JsonValue | null; exampleSource: ExampleSource | null; 
+/**
+ * yaml に書かれた名前つきの例のすべて（設計タブで切り替えて見る）。なければ空。`example` は先頭の値。
+ */
+examples: NamedExample[]; 
 /**
  * スキーマだけから生成した例（「スキーマから例を生成」ボタン用）。
  */
@@ -741,18 +1378,45 @@ export type MediaTypeSpec = { contentType: string;
  */
 schema: JsonValue | null; 
 /**
- * yaml のメディア型に書かれた `example`（なければ `examples` の最初の値）。スキーマから作った例は含まない。
+ * yaml のメディア型に書かれた `example`（なければ `examples` の最初の値。`examples` の先頭と同じ値）。
+ * スキーマから作った例は含まない。
  */
-example: JsonValue | null }
+example: JsonValue | null; 
+/**
+ * yaml に書かれた例のすべて（`example` があれば名前 `example` で先頭に、続いて `examples` を書かれた順に）。
+ * 古い保存データには無いので、読み込みでは空にする。
+ */
+examples?: NamedExample[] }
 /**
  * multipart の 1 パート。
  */
-export type MultipartPart = { name: string; value: MultipartValue; enabled: boolean }
+export type MultipartPart = { name: string; value: MultipartValue; enabled: boolean; 
+/**
+ * このパートの Content-Type（cURL の `-F 'file=@a.png;type=image/png'` の `;type=`）。
+ * なければ、ファイルはファイル名の拡張子から決め、テキストは付けない。
+ */
+contentType?: string | null }
 export type MultipartValue = { kind: "text"; value: string } | 
 /**
  * ファイルのパス。
  */
 { kind: "file"; value: string }
+/**
+ * 名前つきの例（メディア型の `examples` の 1 件）。
+ */
+export type NamedExample = { 
+/**
+ * `examples` のキー。単数の `example` は `example`、配列で書かれた例は `example 1`・`example 2`…。
+ */
+name: string; summary: string | null; description: string | null; value: JsonValue }
+/**
+ * プロキシ・証明書。
+ */
+export type NetworkSettings = { proxy: ProxySettings; 
+/**
+ * OS の証明書ストアに足して信頼する CA 証明書（PEM）のパス。
+ */
+caCertPath: string | null; clientCerts: ClientCertSetting[] }
 /**
  * Operation と RequestDraft を結びつけるキー。operationId があればそれ、なければ `METHOD path`。
  */
@@ -898,7 +1562,63 @@ export type Project = { id: string; name: string; source: ApiSource | null;
 /**
  * 既定の環境の ID（`Environment.id`）。
  */
-defaultEnvironmentId: string | null; createdAt: string; updatedAt: string }
+defaultEnvironmentId: string | null; 
+/**
+ * プロジェクトの設定（cookieAuth・CSRF の自動化のオン・オフ）。
+ */
+settings?: ProjectSettings; createdAt: string; updatedAt: string }
+/**
+ * プロジェクトの設定。画面の認証タブの 2 つのチェック（既定はどちらもオン）。
+ * どちらも、選んでいる環境があるときだけ働く（値は環境の変数 `session`・`xsrfToken`）。
+ */
+export type ProjectSettings = { 
+/**
+ * Cookie `SESSION` の自動化。オンなら、送るときに環境の `session` を Cookie に付け
+ * （既定の認証が付けない `security: []` の API にも。ログインの 2 段階目に必要）、
+ * レスポンスの `Set-Cookie: SESSION=…` で環境の `session` を更新する。
+ */
+autoSession: boolean; 
+/**
+ * CSRF の自動化。オンなら、レスポンスの `Set-Cookie: XSRF-TOKEN=…` を環境の `xsrfToken` に保持し、
+ * 送るときに Cookie `XSRF-TOKEN` と（GET・HEAD・OPTIONS 以外では）`X-XSRF-TOKEN` ヘッダーを付ける。
+ */
+autoCsrf: boolean }
+/**
+ * プロキシの使い方。
+ */
+export type ProxyMode = 
+/**
+ * OS の設定（macOS・Windows のシステム設定。環境変数 `HTTP_PROXY` なども）を使う。
+ */
+"system" | 
+/**
+ * 使わない。
+ */
+"none" | 
+/**
+ * 手で指定する。
+ */
+"manual"
+/**
+ * プロキシの設定。
+ */
+export type ProxySettings = { mode: ProxyMode; 
+/**
+ * `手動` のときのプロキシの URL（`http://host:8080`。ユーザー名・パスワードは URL に書けない）。
+ */
+url: string; 
+/**
+ * `手動` のときの認証のユーザー名（パスワードはキーチェーン。`proxy_password_set`）。
+ */
+username: string; 
+/**
+ * パスワードがキーチェーンにある（読み取り専用。保存のときは無視する）。
+ */
+hasPassword: boolean; 
+/**
+ * プロキシを通さないホスト（`localhost`・`.internal.example`・`10.0.0.0/8` など）。
+ */
+noProxy: string[] }
 /**
  * 問題のある場所（`file:line`）。
  */
@@ -932,7 +1652,16 @@ export type RequestFinished = {
 /**
  * `request_send` が返した送信 ID。
  */
-sendId: string; result: SendOutcome }
+sendId: string; result: SendOutcome; 
+/**
+ * このレスポンスの `Set-Cookie` で自動で更新した環境変数（名前と環境。値は出さない）。
+ * 画面で「session を更新しました」と出す。更新がなければ空。
+ */
+autoUpdates: AutoUpdate[]; 
+/**
+ * 自動で更新できなかったもの（環境が選ばれていない・キーチェーンに書けないなど）。理由は画面にそのまま出せる。
+ */
+autoUpdateSkipped: AutoUpdateSkip[] }
 /**
  * 送信・プレビューの入力（画面で編集している内容と、変数の出どころ）。
  */
@@ -973,7 +1702,31 @@ missingPathParams: string[];
 /**
  * URL を読めないときの理由（送信できない）。
  */
-urlError: string | null; autoHeaders: AutoHeader[] }
+urlError: string | null; autoHeaders: AutoHeader[]; 
+/**
+ * cookieAuth・CSRF の自動化についての説明（付かない理由など。値は含まない）。なければ空。
+ */
+autoNotes: string[] }
+/**
+ * リクエストの設定。
+ */
+export type RequestSettings = { 
+/**
+ * タイムアウト（秒）。`0` は無制限。既定は 30。
+ */
+timeoutSecs: number; 
+/**
+ * リダイレクトを自動で追う。
+ */
+followRedirects: boolean; 
+/**
+ * SSL 証明書を検証する。
+ */
+verifyCertificates: boolean; 
+/**
+ * 表示するレスポンスの上限。
+ */
+responseLimit: ResponseLimit }
 /**
  * 送るリクエストの入力（画面で編集している内容）。`url` と各値に `{{変数}}` を書ける。
  */
@@ -1037,6 +1790,18 @@ export type ResponseDoc = { status: string; description: string | null; contents
  */
 errorCodes: ErrorCodeEntry[] }
 /**
+ * 画面に表示するレスポンスのボディの上限。
+ */
+export type ResponseLimit = 
+/**
+ * 10 MB（既定）。
+ */
+"mb10" | "mb50" | 
+/**
+ * 無制限（受け取れる上限の 512 MB まで）。
+ */
+"unlimited"
+/**
  * yaml の responses の 1 ステータス。
  */
 export type ResponseSpec = { 
@@ -1048,6 +1813,18 @@ status: string; description: string | null; content: MediaTypeSpec[] }
  * 行の中の「名前」と「値」のどちらか。
  */
 export type RowPart = "name" | "value"
+/**
+ * 「入力値として保存」の結果。
+ */
+export type SavedInput = 
+/**
+ * yaml の API の入力値（RequestDraft）に反映した。
+ */
+{ kind: "draft"; draft: RequestDraft; dropped: string[] } | 
+/**
+ * 手で作ったリクエスト（「その他」）として保存した。
+ */
+{ kind: "adhoc"; request: AdHocRequest; dropped: string[] }
 /**
  * スキーマ表の 1 行（深さつき。入れ子のオブジェクト・配列は depth を 1 ずつ増やして続く）。
  */
@@ -1199,6 +1976,62 @@ verifyCertificates: boolean }
  * `servers` の 1 件。URL の `{変数}` は既定値で置き換えてある。
  */
 export type ServerInfo = { url: string; description: string | null }
+/**
+ * 開いているタブの一覧（プロジェクトごと）。
+ */
+export type SessionState = { tabs: SessionTab[]; 
+/**
+ * 選んでいるタブの `id`。
+ */
+activeTabId: string | null; 
+/**
+ * 保存した日時（UTC の RFC 3339。保存のとき Rust が入れる）。
+ */
+savedAt: string | null }
+/**
+ * 開いているタブ 1 つ。
+ */
+export type SessionTab = { 
+/**
+ * 画面が付けるタブの ID。
+ */
+id: string; kind: SessionTabKind; opKey: OpKey | null; adhocId: string | null; 
+/**
+ * タブの見出し。
+ */
+title: string; 
+/**
+ * 未保存の入力（保存済みの内容から変えていないタブは `None`）。`New` はいつも持つ。
+ */
+request: RequestSpec | null; 
+/**
+ * 保存していない変更がある。
+ */
+dirty: boolean; 
+/**
+ * 画面の状態（選んでいるパネルなど。画面が決める文字列。Rust は中身を見ない）。
+ */
+viewState: string | null; 
+/**
+ * 保存のときに空にした手書きのシークレット（「Authorization ヘッダー」など）。画面は「認証の値は復元されません」と出す。
+ */
+droppedFields?: string[] }
+/**
+ * 1 つのタブが何を開いているか。
+ */
+export type SessionTabKind = 
+/**
+ * yaml の API（`op_key`）。
+ */
+"operation" | 
+/**
+ * 保存済みの手で作ったリクエスト（`adhoc_id`）。
+ */
+"adhoc" | 
+/**
+ * まだ保存していない新規のリクエスト（`request` が内容）。
+ */
+"new"
 export type SourceChanged = { changed: boolean; 
 /**
  * 更新日時が変わった（または消えた）ファイル。
@@ -1267,6 +2100,14 @@ version: string; description: string | null; servers: ServerInfo[]; securitySche
  */
 rootSecurity: SecurityRequirement[]; tags: TagInfo[] }
 /**
+ * ステータスの絞り込み。
+ */
+export type StatusClass = "2xx" | "3xx" | "4xx" | "5xx" | 
+/**
+ * 応答がなかった（接続できない・タイムアウト・中止など）。
+ */
+"failed"
+/**
  * `openapi_sync_apply` の結果。
  */
 export type SyncApplyResult = { status: "applied"; diff: SyncDiff; report: ImportReport; project: Project } | { status: "needsUpload"; entry: string } | { status: "needsEntry"; candidates: string[] } | { status: "needsConfirmation"; foreign: ForeignRef[] } | { status: "blocked"; problems: LoadProblem[] }
@@ -1293,6 +2134,14 @@ export type SyncDiff = { added: DiffEntry[]; changed: ChangedEntry[];
 removed: DiffEntry[] }
 export type TagInfo = { name: string; description: string | null }
 /**
+ * 画面のテーマ。
+ */
+export type Theme = "dark" | "light" | 
+/**
+ * OS の設定に合わせる。
+ */
+"system"
+/**
  * 時間の内訳（ミリ秒）。取れなかった区間は `None`。
  */
 export type Timing = { dnsMs: number | null; 
@@ -1316,6 +2165,58 @@ export type UnresolvedRef = { reference: string; from: RefSite; reason: string }
  * 展開できなかった変数 1 件。
  */
 export type UnresolvedVar = { name: string; location: VarLocation }
+/**
+ * 更新が見つかった（`update://available`）。起動時の確認でだけ届く（`update_check` は戻り値で返す）。
+ */
+export type UpdateAvailable = { info: UpdateInfo }
+/**
+ * 見つかった新しい版の情報。
+ */
+export type UpdateInfo = { 
+/**
+ * 新しい版（例: `0.2.0`）。
+ */
+version: string; 
+/**
+ * いま動いている版。
+ */
+currentVersion: string; 
+/**
+ * リリースノート（GitHub のリリースの説明）。
+ */
+notes: string | null; 
+/**
+ * 公開日時（RFC 3339）。
+ */
+date: string | null }
+/**
+ * 入れ替えの段階。
+ */
+export type UpdatePhase = 
+/**
+ * ダウンロード中。
+ */
+"downloading" | 
+/**
+ * ダウンロードが終わり、入れ替えている。
+ */
+"installing" | 
+/**
+ * 入れ替え完了。再起動すると新しい版になる。
+ */
+"installed"
+/**
+ * 入れ替えの進捗（`update://progress`）。
+ */
+export type UpdateProgress = { phase: UpdatePhase; 
+/**
+ * ここまでにダウンロードしたバイト数。
+ */
+downloaded: number; 
+/**
+ * 全体のバイト数（サーバーが教えないときは `None`）。
+ */
+total: number | null }
 /**
  * コピー方式の同期でもう一度選んでもらうファイル。
  */
@@ -1357,6 +2258,26 @@ export type VarOverride = { name: string; value: string }
  * 変数の値。シークレットの実体は OS のキーチェーンにあり、SQLite にも画面へ渡す型にも載せない。
  */
 export type VarValue = { kind: "plain"; value: string } | { kind: "secret" }
+/**
+ * 画面に出す注意の種類。
+ */
+export type WarningKind = 
+/**
+ * 読んで捨てたオプション（`--compressed`、`-k`、`-L`、`-o` など）。「無視したオプション」として出す。
+ */
+"ignored" | 
+/**
+ * 知らないオプション（捨てた）。
+ */
+"unknown" | 
+/**
+ * アプリで扱えない指定（`-b` のファイル名、`@-`（標準入力）、`;filename=` など）。取り込んだ内容から欠ける。
+ */
+"unsupported" | 
+/**
+ * 取り込みでの読み替え（スキームの補完、`-u` のパスワード欠け、`-b` より Cookie ヘッダーが優先など）。
+ */
+"adjusted"
 
 /** tauri-specta globals **/
 

@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 
-import type { OpKey, Project, RequestPreview, RequestSpec } from "../bindings";
+import type { AppSettings, OpKey, Project, ProjectSettings, RequestPreview, RequestSpec } from "../bindings";
 import { opKeyString } from "../lib/opkey";
 import { type RequestTab, useTabsStore } from "../store/tabs";
 import { useUiStore } from "../store/ui";
@@ -15,7 +15,40 @@ export const queryKeys = {
   operations: (projectId: string) => ["operations", projectId] as const,
   operationDetail: (projectId: string, opKey: OpKey) => ["operation", projectId, opKeyString(opKey)] as const,
   sourceChanged: (projectId: string) => ["sourceChanged", projectId] as const,
+  appSettings: ["appSettings"] as const,
+  /** 履歴の一覧（絞り込みごと）。`["history", projectId]` で、そのプロジェクトの履歴をまとめて取り直せる。 */
+  history: (projectId: string, query?: unknown) => (query === undefined ? (["history", projectId] as const) : (["history", projectId, query] as const)),
+  historyEntry: (id: string) => ["historyEntry", id] as const,
 };
+
+/** 画面の既定の設定（まだ読めていないとき）。 */
+export const DEFAULT_PROJECT_SETTINGS: ProjectSettings = { autoSession: true, autoCsrf: true };
+
+/** アプリの設定（外観・リクエスト・プロキシ・履歴など）。 */
+export function useAppSettings() {
+  const backend = useBackend();
+  return useQuery({ queryKey: queryKeys.appSettings, queryFn: () => backend.appSettingsGet(), staleTime: Infinity });
+}
+
+/** 設定を保存する。保存できたら、返ってきた値を画面の設定にする。 */
+export function useSaveAppSettings() {
+  const backend = useBackend();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (settings: AppSettings) => backend.appSettingsSet(settings),
+    onSuccess: (saved) => queryClient.setQueryData(queryKeys.appSettings, saved),
+  });
+}
+
+/** プロジェクトの設定（認証タブの 2 つのチェック）を保存する。 */
+export function useSaveProjectSettings(projectId: string) {
+  const backend = useBackend();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (settings: ProjectSettings) => backend.projectSettingsSet(projectId, settings),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.projects }),
+  });
+}
 
 export function useProjects() {
   const backend = useBackend();

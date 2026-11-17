@@ -1,6 +1,6 @@
 //! プロジェクトのリポジトリ関数。
 
-use nekoreq_core::{new_id, ApiSource, Project, SourceFile, SourceKind};
+use nekoreq_core::{new_id, ApiSource, Project, ProjectSettings, SourceFile, SourceKind};
 use rusqlite::{params, Connection, OptionalExtension, Row};
 
 use crate::error::{Result, StorageError};
@@ -32,11 +32,14 @@ fn not_found(id: &str) -> StorageError {
 }
 
 fn project_from_row(row: &Row<'_>) -> rusqlite::Result<Project> {
+    let settings_json: String = row.get("settings_json")?;
     Ok(Project {
         id: row.get("id")?,
         name: row.get("name")?,
         source: None,
         default_environment_id: row.get("default_environment_id")?,
+        // 読めない設定は既定（どちらもオン）で扱う
+        settings: serde_json::from_str(&settings_json).unwrap_or_default(),
         created_at: row.get("created_at")?,
         updated_at: row.get("updated_at")?,
     })
@@ -110,7 +113,7 @@ fn load_source(conn: &Connection, project_id: &str) -> Result<Option<ApiSource>>
 pub(crate) fn get_project(conn: &Connection, id: &str) -> Result<Option<Project>> {
     let project = conn
         .query_row(
-            "SELECT id, name, default_environment_id, created_at, updated_at
+            "SELECT id, name, default_environment_id, settings_json, created_at, updated_at
              FROM projects WHERE id = ?1",
             [id],
             project_from_row,
@@ -145,6 +148,7 @@ impl Database {
             name,
             source: None,
             default_environment_id: None,
+            settings: ProjectSettings::default(),
             created_at: ts.clone(),
             updated_at: ts,
         })
@@ -154,7 +158,7 @@ impl Database {
     pub fn project_list(&self) -> Result<Vec<Project>> {
         let conn = self.conn();
         let mut stmt = conn.prepare(
-            "SELECT id, name, default_environment_id, created_at, updated_at
+            "SELECT id, name, default_environment_id, settings_json, created_at, updated_at
              FROM projects ORDER BY created_at, rowid",
         )?;
         let mut projects = stmt
@@ -185,14 +189,30 @@ impl Database {
         get_project(&conn, id)?.ok_or_else(|| not_found(id))
     }
 
-    /// プロジェクトを消す。紐づく取り込み元・Operation・入力値・環境・履歴も一緒に消える。
-    pub fn project_delete(&self, id: &str) -> Result<()> {
-        let changed = self
-            .conn()
-            .execute("DELETE FROM projects WHERE id = ?1", [id])?;
+    /// プロジェクトの設定（cookieAuth・CSRF の自動化のオン・オフ）を保存する。更新後のプロジェクトを返す。
+    pub fn project_settings_set(&self, id: &str, settings: &ProjectSettings) -> Result<Project> {
+        let conn = self.conn();
+        let json = serde_json::to_string(settings)
+            .map_err(|e| StorageError::Corrupt(format!("settings_json: {e}")))?;
+        let changed = conn.execute(
+            "UPDATE projects SET settings_json = ?2, updated_at = ?3 WHERE id = ?1",
+            params![id, json, now()],
+        )?;
         if changed == 0 {
             return Err(not_found(id));
         }
+        get_project(&conn, id)?.ok_or_else(|| not_found(id))
+    }
+
+    /// プロジェクトを消す。紐づく取り込み元・Operation・入力値・環境・履歴も一緒に消える。
+    pub fn project_delete(&self, id: &str) -> Result<()> {
+        let conn = self.conn();
+        let changed = conn.execute("DELETE FROM projects WHERE id = ?1", [id])?;
+        if changed == 0 {
+            return Err(not_found(id));
+        }
+        // 消した履歴・環境の内容を WAL に残さない
+        Database::truncate_wal(&conn);
         Ok(())
     }
 }

@@ -34,6 +34,14 @@ docker compose exec workspace bash -c 'cargo test -p nekoreq export_bindings'
 - CI は `git diff --exit-code src/bindings.ts` で、生成し忘れを検出する。
 - エラーは `AppError`（`{ kind, message }`）として TypeScript にも出る。画面側は `src/api/` の `unwrap` が `ApiError` に包んで投げる。
 
+## 配布物のビルド
+
+Mac 用の `.app` / `.dmg` は `scripts/build-mac.sh`（コンテナでクロスビルドし、ホストで組み立てと ad-hoc 署名）。リリースの手順と自動更新の鍵は [07-build-and-release.md](07-build-and-release.md)。
+
+```bash
+scripts/build-mac.sh --dmg   # → dist-mac/NekoReq.app と NekoReq_<版>_<arch>.dmg
+```
+
 ## 注意
 
 - `cargo clippy` / `cargo test` は Tauri の生成コードが `dist/`（`frontendDist`）を要求するため、先に `npm run build`（または空の `dist/` フォルダ）が必要。CI は画面のビルドを Rust より先に流す。
@@ -55,6 +63,8 @@ docker compose exec workspace bash -c 'cargo test -p nekoreq export_bindings'
 ```
 .
 ├── compose.yaml / docker/Dockerfile   開発コンテナ
+├── scripts/                            build-mac.sh（Mac 用の .app / .dmg）、patch-sdk-tbd.sh
+├── .github/workflows/                  ci.yml（検査）、release.yml（タグでビルド・GitHub Releases へ）
 ├── Cargo.toml                          Cargo ワークスペース
 ├── crates/
 │   ├── core/       ドメインモデル、変数展開、リクエストの組み立て、伏せ字処理

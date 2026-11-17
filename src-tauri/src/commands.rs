@@ -1,7 +1,8 @@
 //! 画面から呼ぶコマンド。ロジックは `AppState` にあり、ここは Tauri との受け渡しだけ。
 
 use nekoreq_core::{
-    AdHocRequest, Environment, OpKey, Project, RequestDraft, RequestPreview, SendSettings,
+    AdHocRequest, AppSettings, Environment, HistoryDiff, HistoryEntry, HistoryPage, HistoryQuery,
+    OpKey, Project, ProjectSettings, RequestDraft, RequestPreview, SendSettings, SessionState,
 };
 use nekoreq_openapi::{OperationDetail, OperationListItem, OperationOpen, SourceChanged};
 use serde::Serialize;
@@ -9,7 +10,9 @@ use specta::Type;
 use tauri::State;
 use tauri_specta::Event;
 
+use crate::curl::{CurlExportMode, CurlImport};
 use crate::error::AppError;
+use crate::history::{HistoryOpen, SavedInput};
 use crate::openapi::{
     ImportRequest, ImportResult, PreviewResult, SourceInput, SyncApplyResult, SyncCheckResult,
     UploadInput,
@@ -273,25 +276,33 @@ pub async fn openapi_import(
 
 /// 同期ボタン: yaml を読み直して、前回との差分（追加・変更・削除）を返す。何も反映しない。
 /// コピー方式のときは `upload`（もう一度選んだファイル）が要る（なければ `needsUpload`）。
+/// 別ホストの参照で `needsConfirmation` が返ったら、確認した origin（`foreign[].host`）を `allowedHosts` に
+/// 入れて呼び直す（確認したホストは取り込み元に保存され、以後は確認しない）。
 #[tauri::command]
 #[specta::specta]
 pub async fn openapi_sync_check(
     state: State<'_, AppState>,
     project_id: String,
     upload: Option<UploadInput>,
+    allowed_hosts: Option<Vec<String>>,
 ) -> Result<SyncCheckResult, AppError> {
-    state.openapi_sync_check(&project_id, upload).await
+    state
+        .openapi_sync_check(&project_id, upload, allowed_hosts)
+        .await
 }
 
-/// 同期を反映する。入力値（RequestDraft）は消さない。
+/// 同期を反映する。入力値（RequestDraft）は消さない。`allowedHosts` は `openapi_sync_check` と同じ。
 #[tauri::command]
 #[specta::specta]
 pub async fn openapi_sync_apply(
     state: State<'_, AppState>,
     project_id: String,
     upload: Option<UploadInput>,
+    allowed_hosts: Option<Vec<String>>,
 ) -> Result<SyncApplyResult, AppError> {
-    state.openapi_sync_apply(&project_id, upload).await
+    state
+        .openapi_sync_apply(&project_id, upload, allowed_hosts)
+        .await
 }
 
 /// 更新日時の確認（パス方式）。読み直さず、全ファイルの更新日時だけを見る。起動時とウィンドウに戻ったときに呼ぶ。
@@ -359,8 +370,9 @@ pub fn source_token_set(
     state.source_token_set(&project_id, &token)
 }
 
-/// 取り込んだ yaml を OS の既定のアプリで開く。`file` は `Operation.sourceFile`（入口からの相対パス）。
-/// 行番号は既定のアプリに渡せないので、いまは使わない（OS の既定のアプリが開くだけ）。
+/// 取り込んだ yaml をエディタで開く。`file` は `Operation.sourceFile`（入口からの相対パス）、`line` は行番号。
+/// 設定のコマンド（`AppSettings.editorCommand`）か、VS Code・Cursor・Sublime・JetBrains の順に見つかったエディタで
+/// 行番号まで開く。どれもなければ OS の既定のアプリで開く（行番号は渡せない）。
 #[tauri::command]
 #[specta::specta]
 pub fn editor_open(
@@ -371,9 +383,198 @@ pub fn editor_open(
     line: Option<u32>,
 ) -> Result<(), AppError> {
     use tauri_plugin_opener::OpenerExt;
-    let _ = line;
-    let path = state.editor_target(&project_id, &file)?;
+    let path = match state.editor_open(&project_id, &file, line)? {
+        crate::editor::EditorLaunch::Spawned { .. } => return Ok(()),
+        crate::editor::EditorLaunch::NoneFound => state.editor_target(&project_id, &file)?,
+    };
     app.opener()
         .open_path(path.display().to_string(), None::<&str>)
         .map_err(|e| AppError::Io(format!("ファイルを開けませんでした: {e}")))
+}
+
+// ---- 設定（M5。設定画面は M6） ----
+
+/// プロジェクトの設定（cookieAuth・CSRF の自動化のオン・オフ）を保存する。更新後のプロジェクトを返す。
+#[tauri::command]
+#[specta::specta]
+pub fn project_settings_set(
+    state: State<'_, AppState>,
+    project_id: String,
+    settings: ProjectSettings,
+) -> Result<Project, AppError> {
+    state.project_settings_set(&project_id, &settings)
+}
+
+/// アプリ全体の設定（外観・リクエスト・プロキシと証明書・履歴・エディタのコマンド）。
+#[tauri::command]
+#[specta::specta]
+pub fn app_settings_get(state: State<'_, AppState>) -> Result<AppSettings, AppError> {
+    state.app_settings_get()
+}
+
+/// アプリ全体の設定を保存する。保存した内容（整えたもの）を返す。
+#[tauri::command]
+#[specta::specta]
+pub fn app_settings_set(
+    state: State<'_, AppState>,
+    settings: AppSettings,
+) -> Result<AppSettings, AppError> {
+    state.app_settings_set(&settings)
+}
+
+/// 手動のプロキシのパスワードをキーチェーンに保存する（空なら消す）。更新後の設定を返す。
+#[tauri::command]
+#[specta::specta]
+pub fn proxy_password_set(
+    state: State<'_, AppState>,
+    password: String,
+) -> Result<AppSettings, AppError> {
+    state.proxy_password_set(&password)
+}
+
+/// クライアント証明書（`id`。先に `app_settings_set` で設定に入れておく）のパスワードをキーチェーンに保存する
+/// （空なら消す）。更新後の設定を返す。
+#[tauri::command]
+#[specta::specta]
+pub fn client_cert_password_set(
+    state: State<'_, AppState>,
+    id: String,
+    password: String,
+) -> Result<AppSettings, AppError> {
+    state.client_cert_password_set(&id, &password)
+}
+
+// ---- 履歴（M6） ----
+
+/// 履歴の一覧（新しい順）。ステータス・環境・期間で絞り込み、URL とボディを全文検索できる。続きは `nextCursor`。
+#[tauri::command]
+#[specta::specta]
+pub fn history_list(
+    state: State<'_, AppState>,
+    project_id: String,
+    query: HistoryQuery,
+) -> Result<HistoryPage, AppError> {
+    state.history_list(&project_id, &query)
+}
+
+/// 履歴 1 件（送った内容・受け取った内容・時間・元の入力）。
+#[tauri::command]
+#[specta::specta]
+pub fn history_get(state: State<'_, AppState>, id: String) -> Result<HistoryEntry, AppError> {
+    state.history_get(&id)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn history_delete(state: State<'_, AppState>, id: String) -> Result<(), AppError> {
+    state.history_delete(&id)
+}
+
+/// プロジェクトの履歴をすべて消す。消した件数を返す。
+#[tauri::command]
+#[specta::specta]
+pub fn history_clear(state: State<'_, AppState>, project_id: String) -> Result<u32, AppError> {
+    state.history_clear(&project_id)
+}
+
+/// 編集して開く: 送信に使った元の入力（`{{変数}}` のまま）を返す。
+#[tauri::command]
+#[specta::specta]
+pub fn history_open(state: State<'_, AppState>, id: String) -> Result<HistoryOpen, AppError> {
+    state.history_open(&id)
+}
+
+/// 再送信: 元の入力を今の環境で送り直す。`request_send` と同じく送信 ID をすぐ返し、結果は
+/// `request://finished` で届く（新しい履歴も残る）。
+#[tauri::command]
+#[specta::specta]
+pub async fn history_resend(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    id: String,
+    settings: Option<SendSettings>,
+) -> Result<String, AppError> {
+    state.history_resend(&id, settings, move |finished| {
+        let _ = finished.emit(&app);
+    })
+}
+
+/// 入力値として保存: yaml の API なら入力値（RequestDraft）に、手で作ったものなら「その他」のリクエスト
+/// （AdHocRequest。`name` がなければ `METHOD /path`）として保存する。
+#[tauri::command]
+#[specta::specta]
+pub fn history_save_as_input(
+    state: State<'_, AppState>,
+    id: String,
+    name: Option<String>,
+) -> Result<SavedInput, AppError> {
+    state.history_save_as_input(&id, name.as_deref())
+}
+
+/// 履歴の送った内容（伏せ字済み）を cURL コマンドにする。
+#[tauri::command]
+#[specta::specta]
+pub fn history_curl(state: State<'_, AppState>, id: String) -> Result<String, AppError> {
+    state.history_curl(&id)
+}
+
+/// 2 件のレスポンスの差分（ステータス・ヘッダー・ボディの行単位。JSON は整形してから比べる）。
+#[tauri::command]
+#[specta::specta]
+pub fn history_compare(
+    state: State<'_, AppState>,
+    left_id: String,
+    right_id: String,
+) -> Result<HistoryDiff, AppError> {
+    state.history_compare(&left_id, &right_id)
+}
+
+// ---- cURL（M6） ----
+
+/// cURL を取り込む（何も保存しない）。環境の `baseUrl` と同じホストなら `{{baseUrl}}` に置き換え、
+/// method と path が yaml の API に当てはまればその API の入力値として、なければ「その他」のリクエストとして返す。
+#[tauri::command]
+#[specta::specta]
+pub fn curl_parse(
+    state: State<'_, AppState>,
+    project_id: String,
+    text: String,
+    environment_id: Option<String>,
+) -> Result<CurlImport, AppError> {
+    state.curl_parse(&project_id, &text, environment_id.as_deref())
+}
+
+/// 今の入力を展開して cURL にする。`mode` は「シークレットを伏せる（既定）」か「そのまま」。
+#[tauri::command]
+#[specta::specta]
+pub fn curl_export(
+    state: State<'_, AppState>,
+    input: RequestInput,
+    mode: CurlExportMode,
+) -> Result<String, AppError> {
+    state.curl_export(&input, mode)
+}
+
+// ---- タブの復元（M6） ----
+
+/// 開いているタブと未保存の入力・選んでいるタブを保存する（置き換え）。手で書いた認証の値は空にして保存する
+/// （保存した内容を返す。`droppedFields` に空にしたものの名前が入る）。
+#[tauri::command]
+#[specta::specta]
+pub fn session_save(
+    state: State<'_, AppState>,
+    project_id: String,
+    session: SessionState,
+) -> Result<SessionState, AppError> {
+    state.session_save(&project_id, &session)
+}
+
+/// 前回のタブの状態。保存がなければ `null`。
+#[tauri::command]
+#[specta::specta]
+pub fn session_load(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> Result<Option<SessionState>, AppError> {
+    state.session_load(&project_id)
 }

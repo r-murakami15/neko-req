@@ -17,9 +17,15 @@ pub(crate) async fn load_body(body: &PreparedBody) -> Result<Option<Bytes>, Send
                 out.extend_from_slice(format!("--{boundary}\r\n").as_bytes());
                 match &part.value {
                     PreparedPartValue::Text(text) => {
+                        // `;type=` で指定された Content-Type（なければ付けない）
+                        let content_type = part
+                            .content_type
+                            .as_deref()
+                            .map(|c| format!("\r\nContent-Type: {}", header_safe(c)))
+                            .unwrap_or_default();
                         out.extend_from_slice(
                             format!(
-                                "Content-Disposition: form-data; name=\"{}\"\r\n\r\n",
+                                "Content-Disposition: form-data; name=\"{}\"{content_type}\r\n\r\n",
                                 quote(&part.name)
                             )
                             .as_bytes(),
@@ -37,7 +43,10 @@ pub(crate) async fn load_body(body: &PreparedBody) -> Result<Option<Bytes>, Send
                                 "Content-Disposition: form-data; name=\"{}\"; filename=\"{}\"\r\nContent-Type: {}\r\n\r\n",
                                 quote(&part.name),
                                 quote(file_name),
-                                guess_content_type(file_name)
+                                part.content_type
+                                    .as_deref()
+                                    .map(header_safe)
+                                    .unwrap_or_else(|| guess_content_type(file_name).to_string())
                             )
                             .as_bytes(),
                         );
@@ -58,6 +67,11 @@ async fn read_file(path: &str) -> Result<Vec<u8>, SendError> {
         .map_err(|e| SendError::BodyFile {
             message: format!("ボディのファイルを読めません: {path}（{e}）"),
         })
+}
+
+/// ヘッダーの値に入れられるようにする（改行を空白にして、ヘッダーの注入を防ぐ）。
+fn header_safe(s: &str) -> String {
+    s.replace(['\r', '\n'], " ").trim().to_string()
 }
 
 /// 引用符つきの値に入れられるようにする。
@@ -102,10 +116,12 @@ mod tests {
                 PreparedPart {
                     name: "title".into(),
                     value: PreparedPartValue::Text("こんにちは".into()),
+                    content_type: None,
                 },
                 PreparedPart {
                     name: "f\"ile".into(),
                     value: PreparedPartValue::File(file.display().to_string()),
+                    content_type: None,
                 },
             ],
         };
@@ -115,6 +131,37 @@ mod tests {
             text,
             "--BB\r\nContent-Disposition: form-data; name=\"title\"\r\n\r\nこんにちは\r\n\
              --BB\r\nContent-Disposition: form-data; name=\"f%22ile\"; filename=\"a.json\"\r\nContent-Type: application/json\r\n\r\n{\"x\":1}\r\n\
+             --BB--\r\n"
+        );
+    }
+
+    #[tokio::test]
+    async fn part_content_type_is_used_for_text_and_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("a.bin");
+        std::fs::write(&file, b"x").unwrap();
+        let body = PreparedBody::Multipart {
+            boundary: "BB".into(),
+            parts: vec![
+                PreparedPart {
+                    name: "meta".into(),
+                    value: PreparedPartValue::Text("{}".into()),
+                    content_type: Some("application/json".into()),
+                },
+                PreparedPart {
+                    name: "f".into(),
+                    value: PreparedPartValue::File(file.display().to_string()),
+                    // 改行を入れてもヘッダーは増えない
+                    content_type: Some("image/png\r\nX-Evil: 1".into()),
+                },
+            ],
+        };
+        let bytes = load_body(&body).await.unwrap().unwrap();
+        let text = String::from_utf8(bytes.to_vec()).unwrap();
+        assert_eq!(
+            text,
+            "--BB\r\nContent-Disposition: form-data; name=\"meta\"\r\nContent-Type: application/json\r\n\r\n{}\r\n\
+             --BB\r\nContent-Disposition: form-data; name=\"f\"; filename=\"a.bin\"\r\nContent-Type: image/png  X-Evil: 1\r\n\r\nx\r\n\
              --BB--\r\n"
         );
     }

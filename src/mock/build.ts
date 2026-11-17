@@ -1,5 +1,17 @@
 import type { AutoHeader, KeyValue, ParamIn, RequestPreview, RequestSpec, UnresolvedVar, VarLocation } from "../bindings";
 
+/** 認証の自動化（cookieAuth・CSRF）の材料。Rust 側の `AutoAuth` に当たる。 */
+export interface MockAutoAuth {
+  /** 付ける SESSION の値（自動化がオフ・値がないなら `null`）。 */
+  session: string | null;
+  csrfEnabled: boolean;
+  xsrfToken: string | null;
+  /** 環境の `baseUrl` の origin。 */
+  origin: string | null;
+  /** 先に分かっている「付けられない理由」。 */
+  notes: string[];
+}
+
 /** 変数の値。シークレットなら `secret` が立つ。 */
 export interface ScopedValue {
   value: string;
@@ -119,10 +131,26 @@ export interface Assembled {
   hasBody: boolean;
   /** 展開後（シークレットも実際の値）。 */
   rawUrl: string;
+  /** 実際に送るヘッダー（自動のものを含む。値は伏せていない）。 */
+  headers: { name: string; value: string }[];
+  /** 送るボディのテキスト（JSON・テキスト・フォーム）。multipart・バイナリ・なしは `null`。 */
+  bodyText: string | null;
+  /** multipart のパート。 */
+  parts: { name: string; value: string; isFile: boolean }[];
+}
+
+const SAFE_METHODS = ["GET", "HEAD", "OPTIONS"];
+
+function originOf(url: string): string | null {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return null;
+  }
 }
 
 /** 送信用の組み立て（core の build.rs を、確認用に必要な範囲で真似たもの）。 */
-export function assemble(spec: RequestSpec, lookup: Lookup): Assembled {
+export function assemble(spec: RequestSpec, lookup: Lookup, autoAuth: MockAutoAuth | null = null): Assembled {
   const unresolved: UnresolvedVar[] = [];
   const secrets: string[] = [];
   const ex = (template: string, location: VarLocation): string => {
@@ -205,11 +233,18 @@ export function assemble(spec: RequestSpec, lookup: Lookup): Assembled {
     if (name.trim() !== "") headers.push({ name: name.trim(), value });
   }
   const cookies: string[] = [];
+  const cookieSources: string[] = [];
+  const addCookieSource = (source: string) => {
+    if (!cookieSources.includes(source)) cookieSources.push(source);
+  };
   for (const { row, p } of rowsOf(spec.params, "cookie")) {
     if (!p.enabled) continue;
     const name = ex(p.name, { kind: "param", location: "cookie", row, part: "name" });
     const value = ex(p.value, { kind: "param", location: "cookie", row, part: "value" });
-    if (name.trim() !== "") cookies.push(`${name.trim()}=${value}`);
+    if (name.trim() !== "") {
+      cookies.push(`${name.trim()}=${value}`);
+      addCookieSource("Cookie");
+    }
   }
 
   const auto: AutoHeader[] = [];
@@ -235,19 +270,58 @@ export function assemble(spec: RequestSpec, lookup: Lookup): Assembled {
     if (name !== "") {
       if (a.location === "header") addAuto(name, value, "認証（API キー）");
       else if (a.location === "query") query.push([name, value]);
-      else cookies.push(`${name}=${value}`);
+      else {
+        cookies.push(`${name}=${value}`);
+        addCookieSource("認証タブ（cookieAuth）");
+      }
     }
   }
-  if (cookies.length > 0) addAuto("Cookie", cookies.join("; "), "Cookie・認証");
+
+  // cookieAuth・CSRF の自動化（Rust 側の apply_auto_auth と同じ考え方）
+  const notes: string[] = [...(autoAuth?.notes ?? [])];
+  if (autoAuth && (autoAuth.session !== null || autoAuth.csrfEnabled)) {
+    const dest = originOf(urlText.trim().includes("://") ? urlText.trim() : `http://${urlText.trim()}`);
+    const sameOrigin = autoAuth.origin !== null && dest === autoAuth.origin;
+    if (!sameOrigin) {
+      if (autoAuth.origin !== null && (autoAuth.session !== null || autoAuth.xsrfToken !== null)) {
+        notes.push("送り先が環境の baseUrl と違うため、session・xsrfToken は自動では付けません");
+      }
+    } else {
+      const existing = cookies.map((c) => c.split("=")[0].trim());
+      if (autoAuth.session !== null && !existing.includes("SESSION")) {
+        cookies.push(`SESSION=${autoAuth.session}`);
+        addCookieSource("認証タブ（cookieAuth）");
+        if (!secrets.includes(autoAuth.session)) secrets.push(autoAuth.session);
+      }
+      if (autoAuth.csrfEnabled) {
+        const token = autoAuth.xsrfToken;
+        const needsHeader = !SAFE_METHODS.includes(spec.method.toUpperCase()) && !hasHeader("X-XSRF-TOKEN");
+        if (token !== null) {
+          if (!secrets.includes(token)) secrets.push(token);
+          if (!existing.includes("XSRF-TOKEN")) {
+            cookies.push(`XSRF-TOKEN=${token}`);
+            addCookieSource("CSRF の自動付与");
+          }
+          if (needsHeader) addAuto("X-XSRF-TOKEN", token, "CSRF の自動付与");
+        } else if (needsHeader) {
+          notes.push("CSRF トークン（xsrfToken）がまだありません。GET で XSRF-TOKEN を受け取ると、X-XSRF-TOKEN が自動で付きます");
+        }
+      }
+    }
+  }
+  if (cookies.length > 0) addAuto("Cookie", cookies.join("; "), cookieSources.join("、"));
 
   // ボディ
   let hasBody = false;
+  let bodyText: string | null = null;
+  const parts: { name: string; value: string; isFile: boolean }[] = [];
   const b = spec.body;
   switch (b.kind) {
     case "json": {
       const t = ex(b.value, { kind: "body" });
       if (t.trim() !== "") {
         hasBody = true;
+        bodyText = t;
         addAuto("Content-Type", "application/json", "ボディ");
       }
       break;
@@ -256,6 +330,7 @@ export function assemble(spec: RequestSpec, lookup: Lookup): Assembled {
       const t = ex(b.value, { kind: "body" });
       if (t !== "") {
         hasBody = true;
+        bodyText = t;
         addAuto("Content-Type", "text/plain; charset=utf-8", "ボディ");
       }
       break;
@@ -269,28 +344,28 @@ export function assemble(spec: RequestSpec, lookup: Lookup): Assembled {
       break;
     }
     case "form": {
-      let any = false;
+      const pairs: string[] = [];
       b.value.forEach((r, i) => {
         if (!r.enabled) return;
         const name = ex(r.name, { kind: "bodyForm", row: i + 1, part: "name" });
-        ex(r.value, { kind: "bodyForm", row: i + 1, part: "value" });
-        if (name !== "") any = true;
+        const value = ex(r.value, { kind: "bodyForm", row: i + 1, part: "value" });
+        if (name !== "") pairs.push(`${encodeURIComponent(name)}=${encodeURIComponent(value)}`);
       });
-      if (any) {
+      if (pairs.length > 0) {
         hasBody = true;
+        bodyText = pairs.join("&");
         addAuto("Content-Type", "application/x-www-form-urlencoded", "ボディ");
       }
       break;
     }
     case "multipart": {
-      let any = false;
       b.value.forEach((r, i) => {
         if (!r.enabled) return;
         const name = ex(r.name, { kind: "bodyMultipart", row: i + 1, part: "name" });
-        ex(r.value.value, { kind: "bodyMultipart", row: i + 1, part: "value" });
-        if (name !== "") any = true;
+        const value = ex(r.value.value, { kind: "bodyMultipart", row: i + 1, part: "value" });
+        if (name !== "") parts.push({ name, value, isFile: r.value.kind === "file" });
       });
-      if (any) {
+      if (parts.length > 0) {
         hasBody = true;
         addAuto("Content-Type", "multipart/form-data; boundary=----NekoReqBoundary0000", "ボディ");
       }
@@ -349,10 +424,14 @@ export function assemble(spec: RequestSpec, lookup: Lookup): Assembled {
       missingPathParams: missing,
       urlError,
       autoHeaders,
+      autoNotes: notes,
     },
     secrets,
     hasBody,
     rawUrl: url,
+    headers: headers.map((h) => ({ ...h })),
+    bodyText,
+    parts,
   };
 }
 

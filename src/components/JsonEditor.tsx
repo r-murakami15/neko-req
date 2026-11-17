@@ -57,7 +57,7 @@ const highlight = HighlightStyle.define([
 
 const theme = EditorView.theme(
   {
-    "&": { height: "100%", fontSize: "12.5px", backgroundColor: "var(--bg-panel)", color: "var(--text-sub)" },
+    "&": { height: "100%", fontSize: "var(--editor-font-size, 12.5px)", backgroundColor: "var(--bg-panel)", color: "var(--text-sub)" },
     "&.cm-focused": { outline: "none" },
     ".cm-scroller": { fontFamily: "var(--font-mono)", lineHeight: "1.7", overflow: "auto" },
     ".cm-content": { padding: "12px 0", caretColor: "var(--text)" },
@@ -112,7 +112,8 @@ export function JsonEditor({ value, onChange, unresolved, ariaLabel }: Props) {
           bracketMatching(),
           json(),
           syntaxHighlighting(highlight),
-          keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
+          // Mod-Enter は「送信」のショートカット（画面全体で効く）。エディタの「空行を足す」では使わない
+          keymap.of([{ key: "Mod-Enter", run: () => true }, ...defaultKeymap, ...historyKeymap, indentWithTab]),
           unresolvedSlot.current.of(unresolvedFacet.of(initial.current.unresolved ?? EMPTY)),
           varPlugin,
           theme,

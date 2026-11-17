@@ -12,6 +12,7 @@
 //! M2 で足したもの: 変数展開（`vars`）、リクエストの組み立て（`build`）、伏せ字処理（`redact`）、
 //! 送信の設定と結果の型（`response`）。ここは通信も保存もしない（入出力は http・storage・secrets の仕事）。
 
+pub mod auto_auth;
 pub mod build;
 pub mod environment;
 pub mod history;
@@ -21,25 +22,47 @@ pub mod redact;
 pub mod request;
 mod request_encode;
 pub mod response;
+pub mod sanitize;
+pub mod session;
+pub mod settings;
 pub mod spec;
 pub mod vars;
 
+pub use auto_auth::{
+    cookie_changes, is_csrf_safe_method, origin_of, origin_of_base_url, parse_set_cookie, AutoAuth,
+    AutoCookieChanges, AutoUpdate, AutoUpdateAction, AutoUpdateSkip, CookieChange, SetCookie,
+    BASE_URL_VAR, SESSION_COOKIE, SESSION_VAR, SOURCE_CSRF, SOURCE_SESSION, XSRF_COOKIE,
+    XSRF_HEADER, XSRF_VAR,
+};
 pub use build::{
-    build_request, preview, referenced_variables, AutoHeader, BuildError, PreparedBody,
-    PreparedPart, PreparedPartValue, PreparedRequest, RequestPreview, RequestSpec, DEFAULT_ACCEPT,
-    DEFAULT_ACCEPT_ENCODING, DEFAULT_USER_AGENT,
+    build_request, build_request_with, preview, preview_with, referenced_variables, AutoHeader,
+    BuildError, PreparedBody, PreparedPart, PreparedPartValue, PreparedRequest, RequestPreview,
+    RequestSpec, DEFAULT_ACCEPT, DEFAULT_ACCEPT_ENCODING, DEFAULT_USER_AGENT,
 };
 pub use environment::{EnvVar, Environment, VarValue, GLOBAL_ENVIRONMENT_NAME};
-pub use history::{HeaderPair, HistoryEntry, Timing};
-pub use operation::{
-    match_operations, MediaTypeSpec, OpKey, OpKeyParseError, Operation, OperationMatching,
-    ParamSpec, RequestBodySpec, ResponseSpec, SecurityRef, SecurityRequirement,
+pub use history::{
+    DiffLine, DiffTag, HeaderPair, HistoryBodyKind, HistoryDiff, HistoryEntry, HistoryListItem,
+    HistoryPage, HistoryPart, HistoryQuery, StatusClass, Timing,
 };
-pub use project::{ApiSource, Project, SourceFile, SourceKind};
-pub use redact::{is_sensitive_header, redact_header_value, redact_headers, redact_text, MASK};
+pub use operation::{
+    match_operations, MediaTypeSpec, NamedExample, OpKey, OpKeyParseError, Operation,
+    OperationMatching, ParamSpec, RequestBodySpec, ResponseSpec, SecurityRef, SecurityRequirement,
+};
+pub use project::{ApiSource, Project, ProjectSettings, SourceFile, SourceKind};
+pub use redact::{
+    drop_partial_secret_tail, is_sensitive_header, redact_header_value, redact_headers,
+    redact_text, MASK,
+};
 pub use request::{
     AdHocRequest, ApiKeyIn, AuthOverride, Body, KeyValue, MultipartPart, MultipartValue, ParamIn,
     RequestDraft,
+};
+pub use sanitize::{drop_masked, is_template_only, sanitize_spec, Fill, Sanitized};
+pub use session::{SessionState, SessionTab, SessionTabKind, MAX_SESSION_TABS};
+pub use settings::{
+    AppSettings, AppearanceSettings, ClientCertSetting, HistorySettings, NetworkSettings,
+    ProxyMode, ProxySettings, RequestSettings, ResponseLimit, Theme, EDITOR_FONT_SIZES,
+    HISTORY_LIMITS, MAX_TIMEOUT_SECS,
 };
 
 pub use response::{

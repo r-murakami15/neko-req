@@ -1,14 +1,18 @@
-import { useMemo, useState } from "react";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { errorMessage, useBackend } from "../api";
 import { useEnvironments, useOperationDetail, usePreview, useSaveDraft, useSaveTab } from "../api/queries";
 import type { Body, Project, RequestSpec } from "../bindings";
+import { copyText } from "../lib/clipboard";
 import { PARAM_IN_LABEL } from "../lib/opkey";
 import { countActive, emptyRequiredParams, METHODS, type ParamMeta, specForSend } from "../lib/spec";
 import { describeLocation, indexUnresolved, type Section, splitVars } from "../lib/vars";
+import { useActionsStore } from "../store/actions";
 import { cancelTab, sendTab } from "../store/send";
 import { type RequestPane, type RequestTab, useTabsStore } from "../store/tabs";
-import { ArrowRightIcon } from "./Icons";
+import { ConfirmDialog } from "./Dialog";
+import { ArrowRightIcon, ChevronDownIcon } from "./Icons";
 import { AuthPanel, type AuthKind, defaultAuth } from "./AuthPanel";
 import { BodyPanel, defaultBody } from "./BodyPanel";
 import { DesignPanel } from "./DesignPanel";
@@ -27,6 +31,9 @@ export function RequestEditor({ project, tab }: { project: Project; tab: Request
   const saveTab = useSaveTab();
   const saveDraft = useSaveDraft();
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [curlMessage, setCurlMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  const [rawConfirmOpen, setRawConfirmOpen] = useState(false);
+  const dismissDropped = useTabsStore((s) => s.dismissDropped);
 
   const op = tab.op;
   const opKey = op?.opKey ?? null;
@@ -44,7 +51,8 @@ export function RequestEditor({ project, tab }: { project: Project; tab: Request
     return media && media.generatedExample !== null ? JSON.stringify(media.generatedExample, null, 2) : null;
   }, [detail.data]);
 
-  const refreshKey = `${project.defaultEnvironmentId ?? ""}:${envs.dataUpdatedAt}`;
+  // 環境を選び直した・環境変数を保存した・認証の自動化のチェックを変えたときも、付くヘッダーを聞き直す
+  const refreshKey = `${project.defaultEnvironmentId ?? ""}:${envs.dataUpdatedAt}:${project.settings?.autoSession ?? true}:${project.settings?.autoCsrf ?? true}`;
   const { preview } = usePreview(project.id, sendSpec, refreshKey, opKey);
   const unresolved = useMemo(() => indexUnresolved(preview?.unresolved ?? []), [preview]);
   const unresolvedNames = useMemo(() => new Set((preview?.unresolved ?? []).map((u) => u.name)), [preview]);
@@ -60,6 +68,22 @@ export function RequestEditor({ project, tab }: { project: Project; tab: Request
     void sendTab(backend, tab.id, { projectId: project.id, environmentId: null, request: sendSpec, overrides: [], opKey }, envName);
   };
 
+  /** 今のリクエストを cURL にしてコピーする。既定は秘密を伏せる。`raw` は秘密の値がそのまま入る。 */
+  const copyCurl = async (mode: "redacted" | "raw") => {
+    setCurlMessage(null);
+    try {
+      const text = await backend.curlExport({ projectId: project.id, environmentId: null, request: sendSpec, overrides: [], opKey }, mode);
+      const ok = await copyText(text);
+      setCurlMessage(
+        ok
+          ? { ok: true, text: mode === "raw" ? "cURL をコピーしました（秘密の値を含みます）" : "cURL をコピーしました（秘密の値は伏せています）" }
+          : { ok: false, text: "クリップボードにコピーできませんでした" },
+      );
+    } catch (e) {
+      setCurlMessage({ ok: false, text: `cURL にできませんでした: ${errorMessage(e)}` });
+    }
+  };
+
   const save = () => {
     setSaveError(null);
     if (op) {
@@ -73,6 +97,15 @@ export function RequestEditor({ project, tab }: { project: Project; tab: Request
     }
     saveTab.mutate({ tab }, { onError: (e) => setSaveError(errorMessage(e)) });
   };
+
+  // ショートカット（送信・保存）が、前面のリクエストの最新の操作を呼べるようにする
+  const latest = useRef({ send, save });
+  latest.current = { send, save };
+  const setEditorActions = useActionsStore((s) => s.setEditor);
+  useEffect(() => {
+    setEditorActions({ tabId: tab.id, send: () => latest.current.send(), save: () => latest.current.save() });
+    return () => setEditorActions(null);
+  }, [tab.id, setEditorActions]);
 
   const onBodyKind = (kind: Body["kind"]) => {
     const current = tab.spec.body;
@@ -137,7 +170,8 @@ export function RequestEditor({ project, tab }: { project: Project; tab: Request
               title={op ? "OpenAPI の API の URL は yaml で決まります（{{baseUrl}} は環境変数）" : undefined}
               onChange={(url) => onSpec((s) => ({ ...s, url }))}
               onKeyDown={(e) => {
-                if (e.key === "Enter") send();
+                // Ctrl/⌘+Enter は、画面全体のショートカットが送る（ここでも送ると 2 回送ってしまう）
+                if (e.key === "Enter" && !e.ctrlKey && !e.metaKey) send();
               }}
             />
           </div>
@@ -154,6 +188,22 @@ export function RequestEditor({ project, tab }: { project: Project; tab: Request
           <button type="button" className="btn btn-save" onClick={save} disabled={saveTab.isPending || saveDraft.isPending}>
             保存
           </button>
+          <DropdownMenu.Root>
+            <DropdownMenu.Trigger className="btn btn-curl" aria-label="cURL のメニュー" title="今のリクエストを cURL としてコピー">
+              cURL
+              <ChevronDownIcon />
+            </DropdownMenu.Trigger>
+            <DropdownMenu.Portal>
+              <DropdownMenu.Content className="menu" align="end" sideOffset={6}>
+                <DropdownMenu.Item className="menu-item" onSelect={() => void copyCurl("redacted")}>
+                  <span className="menu-item-text">cURL としてコピー（秘密は伏せる）</span>
+                </DropdownMenu.Item>
+                <DropdownMenu.Item className="menu-item" onSelect={() => setRawConfirmOpen(true)}>
+                  <span className="menu-item-text">cURL としてコピー（秘密もそのまま）…</span>
+                </DropdownMenu.Item>
+              </DropdownMenu.Content>
+            </DropdownMenu.Portal>
+          </DropdownMenu.Root>
         </div>
 
         <div className="expanded" role="status" aria-label="展開後の URL">
@@ -214,7 +264,38 @@ export function RequestEditor({ project, tab }: { project: Project; tab: Request
             保存できませんでした: {saveError}
           </div>
         )}
+        {curlMessage && (
+          <div className={`alert ${curlMessage.ok ? "alert-ok" : "alert-danger"}`} role={curlMessage.ok ? "status" : "alert"}>
+            {curlMessage.text}
+          </div>
+        )}
+        {tab.droppedNote && (
+          <div className="alert alert-warn dropped-note" role="status">
+            <span>
+              {tab.droppedNote.source === "session"
+                ? "手で入力した認証の値は保存していません。入れ直してください"
+                : "履歴には伏せ字で残っているため、手で入力した認証の値は外しました。入れ直してください"}
+              {tab.droppedNote.fields.length > 0 && `（${tab.droppedNote.fields.join("、")}）`}
+            </span>
+            <button type="button" className="link-btn" onClick={() => dismissDropped(tab.id)}>
+              閉じる
+            </button>
+          </div>
+        )}
       </div>
+
+      <ConfirmDialog
+        open={rawConfirmOpen}
+        onOpenChange={setRawConfirmOpen}
+        title="秘密の値をそのままコピーしますか？"
+        description="セッション・トークン・パスワードなどの秘密の値が、平文のまま、クリップボードに入ります。貼り付けた先（チャット・メモ・履歴など）に残らないよう気をつけてください。"
+        confirmLabel="そのままコピー"
+        danger
+        onConfirm={() => {
+          setRawConfirmOpen(false);
+          void copyCurl("raw");
+        }}
+      />
 
       <div className={`panes${designFull ? " is-design" : ""}`}>
         <section className="pane pane-request" aria-label="リクエスト">
@@ -240,13 +321,28 @@ export function RequestEditor({ project, tab }: { project: Project; tab: Request
           <div className="pane-body" role="tabpanel">
             {tab.requestPane === "params" && <ParamsPanel spec={tab.spec} onChange={onSpec} unresolved={unresolved} meta={paramMeta} />}
             {tab.requestPane === "headers" && (
-              <HeadersPanel spec={tab.spec} onChange={onSpec} unresolved={unresolved} autoHeaders={preview?.autoHeaders ?? []} meta={paramMeta} />
+              <HeadersPanel
+                spec={tab.spec}
+                onChange={onSpec}
+                unresolved={unresolved}
+                autoHeaders={preview?.autoHeaders ?? []}
+                autoNotes={preview?.autoNotes ?? []}
+                meta={paramMeta}
+              />
             )}
             {tab.requestPane === "body" && (
               <BodyPanel tab={tab} onSpec={onSpec} onKind={onBodyKind} unresolved={unresolved} schemaExample={op ? schemaExample : null} />
             )}
             {tab.requestPane === "auth" && (
-              <AuthPanel tab={tab} onSpec={onSpec} onKind={onAuthKind} unresolved={unresolved} autoHeaders={preview?.autoHeaders ?? []} />
+              <AuthPanel
+                project={project}
+                tab={tab}
+                onSpec={onSpec}
+                onKind={onAuthKind}
+                unresolved={unresolved}
+                autoHeaders={preview?.autoHeaders ?? []}
+                autoNotes={preview?.autoNotes ?? []}
+              />
             )}
             {tab.requestPane === "design" && <DesignPanel tab={tab} onApplyBody={applyExample} />}
           </div>

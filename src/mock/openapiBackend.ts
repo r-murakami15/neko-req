@@ -60,6 +60,8 @@ export interface MockControls {
   operationCount(projectId: string): number;
   /** ツリーの動作確認用: 合成した API を `count` 件足す（タグは 20 個に振り分ける）。 */
   inflate(projectId: string, count: number): void;
+  /** 次の同期で、入口と別のホストの参照がある（確認が要る）ようにする。確認したホストは覚える。 */
+  requireHostConfirm(on?: boolean): void;
 }
 
 interface ProjectApi {
@@ -119,6 +121,20 @@ export function createOpenApiMock(host: OpenApiHost, drafts: Map<string, Request
   /** 「ディスクの yaml」の版。`touchSource` で 2 になる。 */
   let disk: 1 | 2 = 1;
   let broken = false;
+  let needHostConfirm = false;
+  const confirmedHosts = new Map<string, Set<string>>();
+  /** 同期で確認が要るとき、まだ確認していない別ホストの参照（確認済みなら `null`）。 */
+  const foreignFor = (projectId: string, allowed: string[] | null | undefined): SyncCheckResult | null => {
+    if (!needHostConfirm) return null;
+    const known = confirmedHosts.get(projectId) ?? new Set<string>();
+    for (const h of allowed ?? []) known.add(h);
+    confirmedHosts.set(projectId, known);
+    if (known.has(FOREIGN_HOST)) return null;
+    return {
+      status: "needsConfirmation",
+      foreign: [{ host: FOREIGN_HOST, url: `https://${FOREIGN_HOST}/common.yaml`, referencedFrom: { file: "openapi.yaml", line: 12 } }],
+    };
+  };
 
   const apiOf = (projectId: string): ProjectApi => {
     host.projectOf(projectId);
@@ -348,6 +364,30 @@ export function createOpenApiMock(host: OpenApiHost, drafts: Map<string, Request
     }
   };
 
+  /** method と path で、取り込み済みの API に当てはまるもの（literal な区間が多いものを優先）。 */
+  const matchOperation = (projectId: string, method: string, pathname: string): { opKey: OpKey; op: MockOp; params: Record<string, string> } | null => {
+    const api = apis.get(projectId);
+    if (!api) return null;
+    let best: { op: MockOp; params: Record<string, string>; literal: number } | null = null;
+    for (const op of api.ops) {
+      if (op.method !== method || !api.imported.has(opKeyString(mockOpKey(op)))) continue;
+      const tpl = op.path.split("/");
+      const act = pathname.split("/");
+      if (tpl.length !== act.length) continue;
+      const params: Record<string, string> = {};
+      let literal = 0;
+      let ok = true;
+      tpl.forEach((seg, i) => {
+        const m = /^\{(.+)\}$/.exec(seg);
+        if (m) params[m[1]] = act[i];
+        else if (seg === act[i]) literal += 1;
+        else ok = false;
+      });
+      if (ok && (!best || literal > best.literal)) best = { op, params, literal };
+    }
+    return best ? { opKey: mockOpKey(best.op), op: best.op, params: best.params } : null;
+  };
+
   const methods: Pick<
     Backend,
     | "openapiPreview"
@@ -441,18 +481,22 @@ export function createOpenApiMock(host: OpenApiHost, drafts: Map<string, Request
       return { status: "imported", project, operationCount: selectedKeys.size, report, createdEnvironments: created, diff };
     },
 
-    async openapiSyncCheck(projectId, upload: UploadInput | null): Promise<SyncCheckResult> {
+    async openapiSyncCheck(projectId, upload: UploadInput | null, allowedHosts): Promise<SyncCheckResult> {
       const api = apiOf(projectId);
       if (api.kind === "copy" && upload === null) return { status: "needsUpload", entry: api.entry };
+      const foreign = foreignFor(projectId, allowedHosts);
+      if (foreign) return foreign;
       if (broken) return { status: "blocked", problems: sourceBlocked() };
       const next = mockSpecOps(disk);
       const diff = diffOps(projectId, api.ops, next);
       return { status: "ready", diff, changedFiles: diffIsEmpty(diff) ? [] : changedFilesOf(api.ops, next) };
     },
 
-    async openapiSyncApply(projectId, upload: UploadInput | null): Promise<SyncApplyResult> {
+    async openapiSyncApply(projectId, upload: UploadInput | null, allowedHosts): Promise<SyncApplyResult> {
       const api = apiOf(projectId);
       if (api.kind === "copy" && upload === null) return { status: "needsUpload", entry: api.entry };
+      const foreign = foreignFor(projectId, allowedHosts);
+      if (foreign && foreign.status === "needsConfirmation") return foreign;
       if (broken) return { status: "blocked", problems: sourceBlocked() };
       const next = mockSpecOps(disk);
       const diff = diffOps(projectId, api.ops, next);
@@ -587,6 +631,9 @@ export function createOpenApiMock(host: OpenApiHost, drafts: Map<string, Request
     breakSource: (on = true) => {
       broken = on;
     },
+    requireHostConfirm: (on = true) => {
+      needHostConfirm = on;
+    },
     operationCount: (projectId) => apis.get(projectId)?.imported.size ?? 0,
     inflate: (projectId, count) => {
       const api = apiOf(projectId);
@@ -605,5 +652,14 @@ export function createOpenApiMock(host: OpenApiHost, drafts: Map<string, Request
     },
   };
 
-  return { methods, controls, defaultAuthName };
+  /** 履歴の見出し（API の summary）。 */
+  const summaryOf = (projectId: string, opKey: OpKey): string | null => {
+    try {
+      return findOp(projectId, opKey).op.summary;
+    } catch {
+      return null;
+    }
+  };
+
+  return { methods, controls, defaultAuthName, matchOperation, summaryOf };
 }

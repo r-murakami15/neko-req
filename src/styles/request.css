@@ -45,7 +45,7 @@ p.muted-note {
 .btn-danger-ghost {
   border-color: var(--border-strong);
   background: transparent;
-  color: #ff9b9b;
+  color: var(--danger-soft);
 }
 .icon-btn {
   display: inline-flex;
@@ -995,7 +995,7 @@ input[type="radio"] {
   top: 0;
   height: 14px;
   border-radius: 3px;
-  background: #5c6b85;
+  background: var(--timing-bar);
 }
 .timing-bar.is-accent {
   background: var(--accent);

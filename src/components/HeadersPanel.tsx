@@ -10,12 +10,14 @@ interface Props {
   onChange: (update: (spec: RequestSpec) => RequestSpec) => void;
   unresolved: UnresolvedIndex;
   autoHeaders: AutoHeader[];
+  /** 自動で付かない理由（認証の自動化で、トークンがまだない・送り先が baseUrl と違うなど）。 */
+  autoNotes?: string[];
   /** yaml の API のとき: 説明・必須・「yaml にない」の表示（表示専用）。 */
   meta?: ParamMeta;
 }
 
 /** ヘッダーのタブ。手入力の表と、アプリが自動で付けるヘッダー。 */
-export function HeadersPanel({ spec, onChange, unresolved, autoHeaders, meta }: Props) {
+export function HeadersPanel({ spec, onChange, unresolved, autoHeaders, autoNotes = [], meta }: Props) {
   const [showAuto, setShowAuto] = useState(true);
 
   return (
@@ -51,6 +53,13 @@ export function HeadersPanel({ spec, onChange, unresolved, autoHeaders, meta }: 
               ))
             )}
           </div>
+        )}
+        {showAuto && autoNotes.length > 0 && (
+          <ul className="auto-notes" aria-label="自動で付かないもの">
+            {autoNotes.map((n) => (
+              <li key={n}>{n}</li>
+            ))}
+          </ul>
         )}
       </section>
     </div>

@@ -8,3 +8,6 @@ src-tauri/gen/schemas/
 *.log
 .env
 .intentionally-empty-file.o
+# updater の署名鍵（docs/07-build-and-release.md）。リポジトリに入れない
+.tauri-keys/
+*.key

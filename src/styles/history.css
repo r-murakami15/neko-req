@@ -1,0 +1,402 @@
+/* 履歴の画面。画面イメージ（docs/screens/History.dc.html）の寸法に合わせる。色・余白は theme.css の変数を使う。 */
+
+.screen-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-panel);
+}
+.screen-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+.screen-right {
+  margin-left: auto;
+}
+
+.history-screen {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+.history-body {
+  display: grid;
+  flex: 1 1 auto;
+  grid-template-columns: 460px minmax(0, 1fr);
+  min-height: 0;
+}
+.history-side {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid var(--border);
+}
+.history-filters {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.chip-btn {
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 13px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+.chip-btn[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--bg-active);
+  color: var(--accent-soft);
+}
+.history-filter-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.history-env {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.history-total {
+  margin-left: auto;
+}
+.history-period {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.history-period label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.history-compare-banner {
+  margin: var(--space-2) 14px 0;
+}
+.history-empty {
+  margin: var(--space-4) 14px;
+  color: var(--text-subtle);
+}
+.history-more {
+  margin: var(--space-2) 14px;
+}
+
+/* 一覧（仮想スクロール） */
+.history-scroll {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 0 8px;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+.history-sizer {
+  position: relative;
+  width: 100%;
+}
+.history-slot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+.history-day {
+  width: 100%;
+  padding: 10px 8px 0;
+  color: var(--text-subtle);
+  font-size: 12px;
+}
+.history-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  height: 34px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-sub);
+  text-align: left;
+  cursor: pointer;
+}
+.history-row:hover {
+  background: var(--bg-field);
+}
+.history-row.is-selected {
+  background: var(--bg-active);
+}
+.history-method {
+  flex: 0 0 50px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+}
+.history-method.is-large {
+  flex: none;
+  font-size: 13px;
+}
+.history-path {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.history-status {
+  width: 40px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-align: center;
+}
+.history-ms {
+  width: 62px;
+  color: var(--text-subtle);
+  font-size: 12px;
+  text-align: right;
+}
+.history-time {
+  width: 40px;
+  color: var(--text-subtle);
+  font-size: 12px;
+  text-align: right;
+}
+.history-status.is-ok {
+  color: var(--success);
+}
+.history-status.is-info {
+  color: var(--info);
+}
+.history-status.is-warn {
+  color: var(--warn);
+}
+.history-status.is-danger,
+.history-status.is-fail {
+  color: var(--danger);
+}
+
+/* 詳細 */
+.history-main {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  min-height: 0;
+  padding: 18px 22px;
+  overflow-y: auto;
+}
+.history-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.history-detail-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.history-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+.history-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+.history-badge.is-ok {
+  background: var(--success-bg);
+  color: var(--success);
+}
+.history-badge.is-info {
+  background: var(--info-bg);
+  color: var(--info);
+}
+.history-badge.is-warn {
+  background: var(--warn-bg);
+  color: var(--warn-text);
+}
+.history-badge.is-danger,
+.history-badge.is-fail {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+.history-url {
+  color: var(--text-muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.history-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.history-actions .btn[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--bg-active);
+  color: var(--accent-soft);
+}
+.history-delete {
+  margin-left: auto;
+}
+.history-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  min-height: 0;
+}
+.history-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.history-col-title {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.history-pre {
+  max-height: 520px;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-panel);
+  color: var(--text-sub);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.65;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.history-headers {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.history-headers summary {
+  cursor: pointer;
+}
+.history-header-list {
+  margin-top: 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-panel);
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}
+.history-col .failure {
+  margin: 0;
+}
+
+/* 比較 */
+.compare-sides {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.compare-side {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-panel);
+}
+.compare-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.compare-url {
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.compare-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.compare-h {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+.compare-status {
+  margin: 0;
+}
+.diff {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-panel);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.6;
+  overflow: auto;
+}
+.diff-line {
+  display: grid;
+  grid-template-columns: 40px 40px 20px minmax(0, 1fr);
+  min-width: 0;
+}
+.diff-no {
+  padding: 0 6px;
+  color: var(--text-faint);
+  text-align: right;
+  user-select: none;
+}
+.diff-mark {
+  text-align: center;
+}
+.diff-text {
+  padding-right: 8px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.diff-line.is-insert {
+  background: var(--success-bg);
+  color: var(--success);
+}
+.diff-line.is-delete {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+.diff-line.is-skip {
+  background: var(--bg-code);
+  color: var(--text-subtle);
+}

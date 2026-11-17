@@ -46,11 +46,11 @@
 }
 .badge-required {
   background: var(--danger-bg);
-  color: #ff8f8f;
+  color: var(--danger-strong);
 }
 .badge-version {
-  background: #2a2340;
-  color: #cdb5ff;
+  background: var(--chip-accent-bg);
+  color: var(--chip-accent-text);
   height: 20px;
 }
 .chip {
@@ -72,7 +72,7 @@
 }
 .chip-danger {
   background: var(--danger-bg);
-  color: #ffb4b4;
+  color: var(--danger-soft);
 }
 
 /* ---- ヘッダー・作成画面 ---- */
@@ -214,7 +214,7 @@
   text-decoration: line-through;
 }
 .kv-warn td {
-  background: rgba(58, 26, 29, 0.35);
+  background: var(--danger-wash);
 }
 .auth-source {
   display: flex;
@@ -1070,7 +1070,7 @@
   color: var(--json-key);
 }
 .schema-required {
-  color: #ff8f8f;
+  color: var(--danger-strong);
   white-space: nowrap;
 }
 .schema-constraints {
@@ -1128,10 +1128,10 @@
   color: var(--info);
 }
 .status-num.is-warn {
-  color: #f5b95a;
+  color: var(--json-number);
 }
 .status-num.is-danger {
-  color: #ff8f8f;
+  color: var(--danger-strong);
 }
 .design-strip {
   display: flex;

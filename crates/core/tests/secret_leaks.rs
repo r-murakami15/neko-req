@@ -94,6 +94,7 @@ fn preview_hides_secrets_placed_in_every_location() {
         name: "n".into(),
         value: MultipartValue::Text("{{pPart}}".into()),
         enabled: true,
+        content_type: None,
     }]);
     s.auth = Some(AuthOverride::ApiKey {
         location: ApiKeyIn::Query,

@@ -60,7 +60,7 @@ fn user_version_is_latest() {
         .query_row("PRAGMA user_version", [], |r| r.get(0))
         .unwrap();
     assert_eq!(v, LATEST_VERSION);
-    assert_eq!(v, 4);
+    assert_eq!(v, 6);
 }
 
 #[test]

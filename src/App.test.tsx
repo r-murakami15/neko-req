@@ -57,9 +57,9 @@ describe("外枠", () => {
     // 環境がまだないので選べない
     expect(within(header).getByLabelText("環境")).toBeDisabled();
     expect(within(header).getByRole("button", { name: "環境変数を編集" })).toBeEnabled();
-    // OpenAPI の取り込みは使える。設定はまだ押せず、どのマイルストーンで入るかが分かる
+    // OpenAPI の取り込みも設定も使える
     expect(within(header).getByRole("button", { name: /OpenAPI取り込み/ })).toBeEnabled();
-    expect(within(header).getByRole("button", { name: /設定/ })).toBeDisabled();
+    expect(within(header).getByRole("button", { name: /設定/ })).toBeEnabled();
     // エクスポートは v1 では出さない
     expect(screen.queryByText("エクスポート")).not.toBeInTheDocument();
 

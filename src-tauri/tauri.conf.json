@@ -29,6 +29,7 @@
   "bundle": {
     "active": true,
     "targets": ["dmg", "app", "msi"],
+    "createUpdaterArtifacts": true,
     "category": "DeveloperTool",
     "shortDescription": "OpenAPI の yaml を正本にした API クライアント",
     "icon": [
@@ -41,6 +42,22 @@
     "macOS": {
       "minimumSystemVersion": "10.15",
       "signingIdentity": "-"
+    },
+    "windows": {
+      "wix": {
+        "language": "ja-JP"
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "REPLACE_WITH_UPDATER_PUBLIC_KEY",
+      "endpoints": [
+        "https://github.com/OWNER/REPO/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
     }
   }
 }

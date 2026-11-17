@@ -10,9 +10,9 @@
 use std::collections::HashMap;
 
 use nekoreq_core::{
-    ApiKeyIn, MediaTypeSpec, OpKey, Operation, ParamIn, ParamSpec, RequestBodySpec, ResponseSpec,
-    SecurityRef, SecurityRequirement, SecuritySchemeInfo, SecuritySchemeKind, ServerInfo, SpecMeta,
-    TagInfo,
+    ApiKeyIn, MediaTypeSpec, NamedExample, OpKey, Operation, ParamIn, ParamSpec, RequestBodySpec,
+    ResponseSpec, SecurityRef, SecurityRequirement, SecuritySchemeInfo, SecuritySchemeKind,
+    ServerInfo, SpecMeta, TagInfo,
 };
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -117,6 +117,51 @@ impl<'a> Ctx<'a> {
         }
     }
 
+    /// メディア型に書かれた例のすべて。`example` があれば名前 `example` で先頭に、続いて `examples` を書かれた順に
+    /// （`$ref` はたどる）。`value` がないもの（`externalValue` だけなど）は入れない。
+    fn named_examples(&mut self, file: usize, ptr: &str, node: &'a Value) -> Vec<NamedExample> {
+        let mut out = Vec::new();
+        if let Some(e) = node.get("example") {
+            out.push(NamedExample {
+                name: "example".to_string(),
+                summary: None,
+                description: None,
+                value: e.clone(),
+            });
+        }
+        match node.get("examples") {
+            Some(Value::Object(m)) => {
+                for (k, v) in m {
+                    let eptr = pointer::child(&pointer::child(ptr, "examples"), k);
+                    let Some((_, _, ex)) = self.deref(file, &eptr, v) else {
+                        continue;
+                    };
+                    let Some(value) = ex.get("value") else {
+                        continue;
+                    };
+                    out.push(NamedExample {
+                        name: k.clone(),
+                        summary: text_of(ex, "summary"),
+                        description: text_of(ex, "description"),
+                        value: value.clone(),
+                    });
+                }
+            }
+            Some(Value::Array(a)) => {
+                for (i, v) in a.iter().enumerate() {
+                    out.push(NamedExample {
+                        name: format!("example {}", i + 1),
+                        summary: None,
+                        description: None,
+                        value: v.clone(),
+                    });
+                }
+            }
+            _ => {}
+        }
+        out
+    }
+
     fn schema_of(&mut self, file: usize, ptr: &str, holder: &'a Value) -> Option<Value> {
         let schema = holder.get("schema")?;
         Some(
@@ -174,10 +219,12 @@ impl<'a> Ctx<'a> {
                 let (mfile, mptr, media) = self
                     .deref(file, &mptr, media)
                     .unwrap_or((file, mptr, media));
+                let examples = self.named_examples(mfile, &mptr, media);
                 MediaTypeSpec {
                     content_type: ct.clone(),
                     schema: self.schema_of(mfile, &mptr, media),
-                    example: self.first_example(mfile, &mptr, media),
+                    example: examples.first().map(|e| e.value.clone()),
+                    examples,
                 }
             })
             .collect()

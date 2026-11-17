@@ -114,7 +114,7 @@ pub enum VarValue { Plain(String), Secret }   // Secret の実体はキーチェ
 
 ### 認証
 - v1 の方式: なし、API キー（ヘッダー・クエリ・Cookie）、Bearer、Basic。
-- 既定は yaml の `security` と `securitySchemes` に従う。`security: []` の 6 件は認証なしで送る。
+- 既定は yaml の `security` と `securitySchemes` に従う。`security: []` の 6 件は認証の設定を付けずに送る。ただし cookieAuth の自動化がオンのときは、ブラウザと同じく Cookie の `SESSION` を付ける（2 段階目の email-code-login が 1 段階目のセッションを使うため。2026-11-17 決定）。
 - cookieAuth（Cookie の `SESSION`）: 値は環境変数 `session`。レスポンスの `Set-Cookie: SESSION=…` を受けたら自動で更新する。
 - CSRF: `Set-Cookie: XSRF-TOKEN=…` を環境変数 `xsrfToken` に保持し、GET 以外では `X-XSRF-TOKEN` ヘッダーを自動で付ける。
 - 自動で付くヘッダーはヘッダータブに「自動で付与されるヘッダー」として表示する。

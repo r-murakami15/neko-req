@@ -216,6 +216,7 @@ fn media_doc(m: &MediaTypeSpec, for_request: bool) -> MediaDoc {
         rows,
         example,
         example_source: source,
+        examples: m.examples.clone(),
         generated_example: generated.map(|g| g.value),
     }
 }
@@ -405,6 +406,7 @@ pub fn initial_body(rb: &RequestBodySpec, fill: bool) -> (Body, Option<String>) 
                     },
                     // ファイルはパスを選ぶまで送らない
                     enabled: !is_file,
+                    content_type: None,
                 })
                 .collect(),
         )

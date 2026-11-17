@@ -1,8 +1,7 @@
 import type { Backend } from "../api/backend";
 import { errorMessage } from "../api";
 import type { RequestFinished, RequestInput, SendOutcome } from "../bindings";
-import { DEFAULT_SEND_SETTINGS } from "../lib/spec";
-import { isDirty, useTabsStore } from "./tabs";
+import { IDLE_SEND, isDirty, useTabsStore } from "./tabs";
 
 /**
  * 送信の流れ。
@@ -12,21 +11,39 @@ import { isDirty, useTabsStore } from "./tabs";
  * 届いたものは `early` に取っておく。
  */
 const listening = new WeakMap<Backend, Promise<() => void>>();
-const early = new Map<string, SendOutcome>();
+const early = new Map<string, RequestFinished>();
+/** 送信が終わるたびに呼ぶもの（環境の一覧・履歴の取り直しなど）。 */
+const finishedHooks = new Set<(event: RequestFinished) => void>();
+
+/** 送信が終わったときの処理を足す。外す関数を返す。 */
+export function onSendFinished(hook: (event: RequestFinished) => void): () => void {
+  finishedHooks.add(hook);
+  return () => {
+    finishedHooks.delete(hook);
+  };
+}
 /** 閉じたタブの結果が溜まり続けないように、取っておく数は少なくする。 */
 const MAX_EARLY = 4;
 
-function finish(tabId: string, outcome: SendOutcome) {
-  useTabsStore.getState().setSend(tabId, (s) => ({ ...s, phase: "finished", outcome, cancelRequested: false }));
+function finish(tabId: string, outcome: SendOutcome, event?: RequestFinished) {
+  useTabsStore.getState().setSend(tabId, (s) => ({
+    ...s,
+    phase: "finished",
+    outcome,
+    cancelRequested: false,
+    autoUpdates: event?.autoUpdates ?? [],
+    autoUpdateSkipped: event?.autoUpdateSkipped ?? [],
+  }));
 }
 
 function onFinished(event: RequestFinished) {
+  for (const hook of [...finishedHooks]) hook(event);
   const tab = useTabsStore.getState().tabs.find((t) => t.send.sendId === event.sendId);
   if (tab) {
-    finish(tab.id, event.result);
+    finish(tab.id, event.result, event);
     return;
   }
-  early.set(event.sendId, event.result);
+  early.set(event.sendId, event);
   while (early.size > MAX_EARLY) early.delete(early.keys().next().value as string);
 }
 
@@ -44,7 +61,7 @@ const failure = (message: string): SendOutcome => ({ status: "failure", error: {
 
 export async function sendTab(backend: Backend, tabId: string, input: RequestInput, envName: string | null) {
   const tabs = useTabsStore.getState();
-  tabs.setSend(tabId, () => ({ phase: "sending", sendId: null, cancelRequested: false, outcome: null, envName }));
+  tabs.setSend(tabId, () => ({ ...IDLE_SEND, phase: "sending", envName }));
   try {
     await ensureListening(backend);
   } catch (e) {
@@ -54,12 +71,17 @@ export async function sendTab(backend: Backend, tabId: string, input: RequestInp
 
   let sendId: string;
   try {
-    sendId = await backend.requestSend(input, DEFAULT_SEND_SETTINGS);
+    // 設定画面で保存した値（タイムアウト・リダイレクト・証明書の検証）を使わせる
+    sendId = await backend.requestSend(input, null);
   } catch (e) {
     if (useTabsStore.getState().tabs.some((t) => t.id === tabId)) finish(tabId, failure(errorMessage(e)));
     return;
   }
+  await attachSend(backend, tabId, sendId);
+}
 
+/** 送信 ID が分かったあと、タブに結びつける（先に届いた結果があれば、すぐ反映する）。 */
+async function attachSend(backend: Backend, tabId: string, sendId: string) {
   const tab = useTabsStore.getState().tabs.find((t) => t.id === tabId);
   if (!tab) {
     // 送っている間にタブが閉じられた
@@ -70,7 +92,7 @@ export async function sendTab(backend: Backend, tabId: string, input: RequestInp
   const arrived = early.get(sendId);
   if (arrived) {
     early.delete(sendId);
-    finish(tabId, arrived);
+    finish(tabId, arrived.result, arrived);
   } else if (tab.send.cancelRequested) {
     await backend.requestCancel(sendId);
   }
@@ -108,4 +130,26 @@ export function closeTab(backend: Backend, tabId: string, force = false) {
   }
   cancelIfSending(backend, tabId);
   state.close(tabId);
+}
+
+/**
+ * 履歴の「再送信」: 元の入力をタブとして開き、そのタブで送信の結果を受け取る。
+ * 送る前にタブを作って購読しておくので、結果が先に届いても取りこぼさない。
+ */
+export async function resendInTab(backend: Backend, tabId: string, envName: string | null, start: () => Promise<string>) {
+  useTabsStore.getState().setSend(tabId, () => ({ ...IDLE_SEND, phase: "sending", envName }));
+  try {
+    await ensureListening(backend);
+  } catch (e) {
+    finish(tabId, failure(errorMessage(e)));
+    return;
+  }
+  let sendId: string;
+  try {
+    sendId = await start();
+  } catch (e) {
+    if (useTabsStore.getState().tabs.some((t) => t.id === tabId)) finish(tabId, failure(errorMessage(e)));
+    return;
+  }
+  await attachSend(backend, tabId, sendId);
 }

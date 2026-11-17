@@ -26,6 +26,8 @@ const safeStorage: StateStorage = {
   },
 };
 
+export type Screen = "main" | "environments" | "history";
+
 interface UiState {
   /** いま開いているプロジェクト。存在しない ID のときは画面側で先頭のプロジェクトに読み替える。 */
   currentProjectId: string | null;
@@ -33,9 +35,12 @@ interface UiState {
   /** 「新しいプロジェクト」のダイアログ。 */
   createDialogOpen: boolean;
   setCreateDialogOpen: (open: boolean) => void;
-  /** メインの画面か、環境変数の画面か。 */
-  screen: "main" | "environments";
-  setScreen: (screen: "main" | "environments") => void;
+  /** メインの画面か、環境変数の画面か、履歴の画面か。 */
+  screen: Screen;
+  setScreen: (screen: Screen) => void;
+  /** 設定のダイアログ。 */
+  settingsDialogOpen: boolean;
+  setSettingsDialogOpen: (open: boolean) => void;
   /** 「新規作成」のダイアログ。 */
   newRequestDialogOpen: boolean;
   setNewRequestDialogOpen: (open: boolean) => void;
@@ -56,6 +61,8 @@ export const useUiStore = create<UiState>()(
       setCreateDialogOpen: (open) => set({ createDialogOpen: open }),
       screen: "main",
       setScreen: (screen) => set({ screen }),
+      settingsDialogOpen: false,
+      setSettingsDialogOpen: (open) => set({ settingsDialogOpen: open }),
       newRequestDialogOpen: false,
       setNewRequestDialogOpen: (open) => set({ newRequestDialogOpen: open }),
       importDialogOpen: false,

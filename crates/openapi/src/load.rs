@@ -41,6 +41,8 @@ pub struct LoadParams {
     /// 基準フォルダ。あれば、解決した `$ref` がこの外のファイルなら読まない（アップロードのコピー方式。
     /// 一時フォルダ・`sources/<ID>`）。`None`（パス方式）は制限なし。
     pub root: Option<PathBuf>,
+    /// URL の取得に使うプロキシ・CA 証明書・クライアント証明書（設定画面の値）。`None` なら何も足さない。
+    pub transport: Option<nekoreq_http::Transport>,
 }
 
 impl std::fmt::Debug for LoadParams {
@@ -50,6 +52,7 @@ impl std::fmt::Debug for LoadParams {
             .field("token", &self.token.as_ref().map(|_| "***"))
             .field("allowed_hosts", &self.allowed_hosts)
             .field("root", &self.root)
+            .field("transport", &self.transport)
             .finish()
     }
 }
@@ -269,11 +272,14 @@ impl Crawler<'_> {
                 Ok((bytes, modified_string(p), None))
             }
             Loc::Url(u) => {
-                let (bytes, final_url) = nekoreq_http::fetch_bytes_at(
+                let default_transport = nekoreq_http::Transport::default();
+                let transport = self.params.transport.as_ref().unwrap_or(&default_transport);
+                let (bytes, final_url) = nekoreq_http::fetch_bytes_with(
                     u,
                     self.token_for(loc),
                     FETCH_TIMEOUT,
                     MAX_FILE_BYTES,
+                    transport,
                 )
                 .await
                 .map_err(|e| e.message)?;

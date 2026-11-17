@@ -382,6 +382,21 @@ impl Database {
         Ok(())
     }
 
+    /// 確認済みの別ホスト（origin）の一覧を保存する（同期で確認したホストを覚える）。
+    pub fn source_set_allowed_hosts(&self, project_id: &str, hosts: &[String]) -> Result<()> {
+        let n = self.conn().execute(
+            "UPDATE api_sources SET allowed_hosts_json = ?2 WHERE project_id = ?1",
+            params![project_id, to_json(&hosts, "allowed_hosts_json")?],
+        )?;
+        if n == 0 {
+            return Err(StorageError::NotFound {
+                what: "取り込み元",
+                id: project_id.into(),
+            });
+        }
+        Ok(())
+    }
+
     /// URL 方式のアクセストークンの有無を記録する。
     pub fn source_set_has_token(&self, project_id: &str, has_token: bool) -> Result<()> {
         let n = self.conn().execute(

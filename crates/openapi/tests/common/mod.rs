@@ -18,6 +18,7 @@ pub async fn load_path(p: &Path) -> LoadResult {
         token: None,
         allowed_hosts: vec![],
         root: None,
+        transport: None,
     })
     .await
 }

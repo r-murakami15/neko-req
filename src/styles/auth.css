@@ -1,0 +1,154 @@
+/* 認証の自動化（cookieAuth・CSRF）・送信結果の通知・cURL（作成とコピー）のスタイル。色・余白は theme.css の変数を使う。 */
+
+/* ---- 認証タブ: 自動化の 2 つのチェック ---- */
+
+.auto-auth {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-panel);
+}
+.auto-auth-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+}
+.auto-auth-item input {
+  margin-top: 3px;
+}
+.auto-auth-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.auto-auth-sub {
+  color: var(--text-subtle);
+  font-size: 12px;
+}
+.auto-notes {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  color: var(--warn-text);
+  font-size: 12px;
+}
+.auto-notes li + li {
+  margin-top: 2px;
+}
+
+/* ---- 送信結果: 自動で更新した変数 ---- */
+
+.auto-updates {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px var(--space-4);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+.auto-update {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.auto-update.is-ok {
+  color: var(--success);
+}
+.auto-update.is-warn {
+  color: var(--warn-text);
+}
+
+.headers-note {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  color: var(--text-subtle);
+  font-size: 12px;
+}
+.headers-note-mark {
+  color: var(--var);
+}
+
+/* ---- 共通の小さな部品 ---- */
+
+/* 入力欄の例（プレースホルダー）。ブラウザの既定の薄い灰色は、ライトテーマで 4.5:1 に届かない */
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-subtle);
+  opacity: 1;
+}
+
+.alert-ok {
+  border-color: var(--success);
+  background: var(--success-bg);
+  color: var(--success);
+}
+.dropped-note {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.btn-curl {
+  gap: 4px;
+  padding: 0 10px;
+  height: 38px;
+  border-radius: var(--radius-lg);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.segmented-item[aria-selected="true"] {
+  background: var(--bg-active);
+  color: var(--accent-soft);
+}
+.example-switch {
+  margin-top: var(--space-2);
+}
+.example-summary {
+  margin: 6px 0 0;
+}
+.input-small {
+  height: 30px;
+  padding: 0 8px;
+  border-radius: var(--radius);
+}
+
+/* ---- 新規作成: cURL ---- */
+
+.curl-result {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.curl-result.is-ok {
+  color: var(--success);
+}
+.curl-result.is-bad {
+  color: var(--danger);
+}
+.curl-url {
+  overflow-wrap: anywhere;
+}
+.curl-warnings {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--warn);
+  border-radius: var(--radius-lg);
+  background: var(--warn-bg);
+  color: var(--warn-text);
+  font-size: 12px;
+  list-style: none;
+}
+.curl-warnings li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}

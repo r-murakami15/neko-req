@@ -1,6 +1,8 @@
 //! 画面に渡す型（取り込みの確認・同期の差分・設計タブ・API ツリー）。すべて `specta::Type`（TypeScript に出る）。
 
-use nekoreq_core::{ApiKeyIn, OpKey, ParamIn, RequestSpec, SecurityRequirement, ServerInfo};
+use nekoreq_core::{
+    ApiKeyIn, NamedExample, OpKey, ParamIn, RequestSpec, SecurityRequirement, ServerInfo,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use specta::Type;
@@ -91,7 +93,8 @@ impl LoadProblem {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ForeignRef {
-    /// `host` または `host:port`。確認したら `allowedHosts` に入れて読み直す。
+    /// 参照先の origin（`https://assets.example.com`・`http://127.0.0.1:8080` の形。スキーム・ホスト（小文字）・
+    /// 既定でないポート。既定のポートは省く）。確認したら `allowedHosts` に入れて読み直す。
     pub host: String,
     pub url: String,
     pub referenced_from: RefSite,
@@ -340,9 +343,11 @@ pub struct MediaDoc {
     /// ルートの型の表示（例: `PasswordLoginRequest`、`ClientListItem[]`）。スキーマがなければ `None`。
     pub schema_label: Option<String>,
     pub rows: Vec<SchemaRow>,
-    /// 表示する例（yaml の example があればそれ、なければ生成したもの）。
+    /// 表示する例（yaml の example があればその最初のもの、なければ生成したもの）。
     pub example: Option<Value>,
     pub example_source: Option<ExampleSource>,
+    /// yaml に書かれた名前つきの例のすべて（設計タブで切り替えて見る）。なければ空。`example` は先頭の値。
+    pub examples: Vec<NamedExample>,
     /// スキーマだけから生成した例（「スキーマから例を生成」ボタン用）。
     pub generated_example: Option<Value>,
 }

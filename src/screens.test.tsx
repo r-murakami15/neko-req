@@ -187,7 +187,7 @@ describe("送信", () => {
       requestSend: async (input, settings) => {
         const sendId = await base.requestSend(input, settings);
         // 戻り値を返す前に、結果のイベントを届ける
-        for (const h of handlers) h({ sendId, result: { status: "failure", error: { kind: "timeout", message: "30 秒以内に応答がありませんでした" } } });
+        for (const h of handlers) h({ sendId, result: { status: "failure", error: { kind: "timeout", message: "30 秒以内に応答がありませんでした" } }, autoUpdates: [], autoUpdateSkipped: [] });
         return sendId;
       },
     };

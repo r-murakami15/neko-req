@@ -7,3 +7,16 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
+# 変換先の型（RequestSpec・KeyValue・Body・AuthOverride など）と伏せ字処理
+nekoreq-core = { workspace = true }
+# POSIX シェルの単語分割。`$'...'` と行継続は前処理（lexer.rs）で整えてから渡す
+shell-words = "1.1.1"
+base64 = { workspace = true }
+percent-encoding = { workspace = true }
+serde = { workspace = true }
+# 画面へ返す型（ParsedCurl など）を tauri-specta が TypeScript に書き出せるようにする
+specta = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }

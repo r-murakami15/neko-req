@@ -6,7 +6,9 @@ import App from "../App";
 import { BackendProvider } from "../api";
 import type { Backend } from "../api/backend";
 import { createMockBackend } from "../mock/backend";
+import { useActionsStore } from "../store/actions";
 import { useTabsStore } from "../store/tabs";
+import { useUpdateStore } from "../store/update";
 import { useUiStore } from "../store/ui";
 
 /** モックのバックエンドで App を描画する。 */
@@ -16,6 +18,10 @@ export function renderApp(backend: Backend = createMockBackend()) {
   } catch {
     /* 使えなくてもよい */
   }
+  document.documentElement.removeAttribute("data-theme");
+  document.documentElement.style.removeProperty("--editor-font-size");
+  useUpdateStore.getState().reset();
+  useActionsStore.getState().setEditor(null);
   useUiStore.setState({
     currentProjectId: null,
     createDialogOpen: false,
@@ -23,6 +29,7 @@ export function renderApp(backend: Backend = createMockBackend()) {
     newRequestDialogOpen: false,
     importDialogOpen: false,
     syncDialogOpen: false,
+    settingsDialogOpen: false,
   });
   useTabsStore.getState().reset();
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });

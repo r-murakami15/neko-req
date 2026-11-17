@@ -937,16 +937,19 @@ async fn multipart_with_binary_file_and_japanese_names_is_well_formed_on_the_wir
             name: "題名".into(),
             value: MultipartValue::Text("こんにちは\r\n世界".into()),
             enabled: true,
+            content_type: None,
         },
         MultipartPart {
             name: "file".into(),
             value: MultipartValue::File(file.display().to_string()),
             enabled: true,
+            content_type: None,
         },
         MultipartPart {
             name: "e\"mpty".into(),
             value: MultipartValue::File(empty.display().to_string()),
             enabled: true,
+            content_type: None,
         },
     ]);
     send_default(&build_request(&s, &VarScope::new(), &NoDyn).unwrap())

@@ -14,7 +14,7 @@ import { ApiTree } from "./ApiTree";
 import { ConfirmDialog } from "./Dialog";
 import { ClockIcon, ListIcon, SearchIcon, SyncIcon } from "./Icons";
 
-/** 左のサイドバー。API ツリー（タグのフォルダ・削除された API・その他）・検索・同期ボタン・環境変数。履歴は M6。 */
+/** 左のサイドバー。API ツリー（タグのフォルダ・削除された API・その他）・検索・同期ボタン・環境変数・履歴。 */
 export function Sidebar({ project }: { project: Project }) {
   const backend = useBackend();
   const queryClient = useQueryClient();
@@ -164,7 +164,7 @@ export function Sidebar({ project }: { project: Project }) {
           <ListIcon />
           環境変数
         </button>
-        <button type="button" className="nav-link" disabled title="履歴は M6 で実装">
+        <button type="button" className="nav-link" onClick={() => setScreen("history")}>
           <ClockIcon />
           履歴
         </button>

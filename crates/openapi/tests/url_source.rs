@@ -36,6 +36,7 @@ fn params(url: String, token: Option<&str>, allowed: Vec<String>) -> LoadParams 
         token: token.map(String::from),
         allowed_hosts: allowed,
         root: None,
+        transport: None,
     }
 }
 

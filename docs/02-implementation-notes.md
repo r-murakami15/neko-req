@@ -81,9 +81,9 @@
 | servers → 環境 | 取り込みのときだけ作る（同期では作らない）。名前は servers の `description`（なければ URL）、変数は `baseUrl`。同名の環境があれば作らない。URL の `{変数}` は既定値で置き換える | 消した環境が同期で戻らないように |
 | アップロード | 選んだパス（フォルダ・ファイル・zip の絶対パス。画面は Tauri のダイアログ / ドロップのパスを渡す）を一時フォルダに置いてから読み、取り込みで `sources/<プロジェクト ID>/` に移す。置くのは yaml / yml / json だけ（`node_modules`・`.git` などは除く）。上限は 5,000 ファイル・256 MB。zip は `..` や絶対パスのエントリを拒否する。フォルダ 1 つなら中身を直下に、複数なら共通の親からの相対パスを保つ。同期（コピー方式）は `upload` でもう一度選んでもらう | 設計書「コピー方式」 |
 | URL | 取得は http クレートの `fetch_bytes`（送信と同じ TLS）。アクセストークンは `Authorization: Bearer` で入口と同じ origin にだけ送る（別ホストには送らない）。キーチェーンの場所は `NekoReq/<プロジェクト ID>` の `source/token`。入口と別のホスト（ローカルの入口が URL を参照する場合も）は、読む前に `needsConfirmation` で止め、確認したホストは `api_sources.allowed_hosts` に覚える | 設計書「URL 方式」 |
-| 既定の認証 | `RequestInput.opKey` があり `request.auth` が `None` のとき、Operation の security（未指定なら全体）の最初の対応できる方式を使う。apiKey（header / query / cookie）・http bearer / basic だけ（OAuth 2.0 などは v2）。変数名は cookie の apiKey がキーの名前の小文字（`SESSION` → `session`）、それ以外の apiKey は scheme 名、bearer は `token`、basic は `username` / `password`。使う変数が展開できないときは認証なしで送る（cookieAuth の自動化は M5）。`security: []` は認証なし | 設計書「認証」。値がないだけで送信を止めない |
+| 既定の認証 | `RequestInput.opKey` があり `request.auth` が `None` のとき、Operation の security（未指定なら全体）の最初の対応できる方式を使う。apiKey（header / query / cookie）・http bearer / basic だけ（OAuth 2.0 などは v2）。変数名は cookie の apiKey がキーの名前の小文字（`SESSION` → `session`）、それ以外の apiKey は scheme 名、bearer は `token`、basic は `username` / `password`。使う変数が展開できないときは認証なしで送る。`security: []` は認証なし（cookieAuth の自動化がオンなら、M5 で SESSION は `security: []` の API にも付く。下の「M5」の表）| 設計書「認証」。値がないだけで送信を止めない |
 | パラメータの初期値 | すべて無効の状態（path も）。example → default の順。ボディは example（なければモック）。form / multipart はスキーマの項目から行を作る（ファイルの項目はパスを選ぶまで無効） | 設計書の対応表どおり |
-| エディタ | `editor_open` は取り込んだファイルの一覧にあるものだけ開ける。`tauri-plugin-opener` の `open_path`（OS の既定のアプリ）を Rust から呼ぶ。行番号は渡せない。capabilities は増やさない（画面から opener は呼べない） | 最小限の権限 |
+| エディタ | `editor_open` は取り込んだファイルの一覧にあるものだけ開ける。`tauri-plugin-opener` の `open_path`（OS の既定のアプリ）を Rust から呼ぶ。行番号は渡せない（M5 で行番号つきのエディタ起動を足した。下の「M5」の表）。capabilities は増やさない（画面から opener は呼べない） | 最小限の権限 |
 | workspace | `serde_json` の `preserve_order` を workspace で有効にした（yaml の順を保つ）。http クレートに `fetch_bytes` を足した | |
 
 ## 2026-11-17 M3・M4 の修正（テスト担当の指摘への対応）
@@ -108,7 +108,7 @@
 | 3.0 の `exclusiveMinimum: true` | 制約に「> 0」「< 10」と出す（`minimum` / `maximum` を含まない）。3.1 の数値の `exclusiveMinimum` は従来どおり `exclusiveMin: 0` | 0 を含むと誤解されない |
 | モック | `maximum` / `exclusiveMaximum` を超えない数値、`minItems` 個（最大 10）・`maxItems` を超えない配列を作る。モック全体のノード数は 5,000 まで | そのまま送ると 400 になるのを避ける |
 | YAML の merge key | `<<: *base`・`<<: [*a, *b]` を展開する（マッピングに直接書いたキーが `<<` の前後どちらでも勝ち、リストでは前のものが勝つ）。`<<` の値がマッピング（のリスト）でなければふつうのキー。行番号は `<<` の行 | YAML の仕様どおり |
-| examples の複数保持 | 今回は見送り（M5）。`MediaTypeSpec.example` を複数にする型の変更で `src/bindings.ts` が変わるため | 画面の担当が作業中 |
+| examples の複数保持 | 今回は見送り → M5 で対応（下の「M5」の表） | 画面の担当が作業中だったため |
 | タブ字下げの JSON の行番号 | 今回は扱わない（行番号なしのまま） | |
 
 ## 2026-11-17 オーケストレータの判断（M3）
@@ -117,3 +117,170 @@
 | --- | --- | --- |
 | 取り込んだ API を開いたときのパラメータ | path パラメータは有効、query・header・cookie は無効で並べる | path パラメータは OpenAPI で常に必須。設計書の「無効の状態で並べる」は任意の項目に当てはめる |
 | 既定の認証の変数名 | cookie の apiKey はキー名の小文字（`SESSION` → `session`）、ほかの apiKey は scheme 名、bearer は `token`、basic は `username` / `password`。展開できないときは認証なしで送る | 設計書の cookieAuth（環境変数 `session`）に合わせる |
+
+## 2026-11-17 M5（cookieAuth と CSRF の自動化）
+
+実 API（バックエンド apps/backend の SecurityConfig・AuthController）で確かめたこと: CSRF は Cookie 方式（`CookieCsrfTokenRepository`）で、
+`XSRF-TOKEN` Cookie の値と `X-XSRF-TOKEN` ヘッダーの値の**両方**がそろって同じでないと 403（FORBIDDEN）。`GET /api/v1/auth/session` が
+`XSRF-TOKEN` を発行する（Cookie に値がなければ）。ログインは自作の AuthController で、2 段階目（`email-code-login`）はセッション ID を作り直す。
+ログインの API 3 つ（`password-login`・`email-code-login`・`session`）は yaml で `security: []`。`dev` プロファイル（docker-compose の既定）では
+CSRF が無効で `XSRF-TOKEN` も出ない（取引先 API も認証不要）。CSRF まで確かめるときは dev 以外で起動する。
+
+### 設定と送るとき
+
+| 項目 | 決定 | 理由 |
+| --- | --- | --- |
+| 設定 | `Project.settings`（`autoSession`・`autoCsrf`。既定はどちらもオン）。マイグレーション v5 で `projects.settings_json`、コマンド `project_settings_set`。画面の認証タブの 2 つのチェック | プロジェクトごとに個別に切り替える |
+| 使う変数と名前 | 環境変数 `session`（Cookie `SESSION`）・`xsrfToken`（Cookie `XSRF-TOKEN`、ヘッダー `X-XSRF-TOKEN`）・`baseUrl`。名前は固定（yaml の securityScheme の名前は見ない）。値は選んでいる環境の変数（変数の層は「上書き › 環境 › グローバル」のままなので、グローバルの `session` も読める） | 設計書「認証」の名前 |
+| SESSION を付ける範囲 | 自動化がオンで環境が選ばれていて `session` の値があるとき、Cookie `SESSION` を付ける。**`security: []` の API にも付ける**（ログインの 2 段階目が 1 段階目の SESSION を要るため。ブラウザの Cookie と同じ）。認証を自分で選んだリクエスト（`request.auth` が `None` でない。なし・API キー・Bearer など）には付けない。既定の認証がすでに `SESSION` を付けていれば重ねない | 完了条件（ログイン → メール認証コード → 登録）を手でコピーせずに通すため。M3 の「`security: []` には付けない」は、自動化をオフにしたときの動き |
+| CSRF を付ける範囲 | オンで `xsrfToken` の値があるとき、Cookie `XSRF-TOKEN` を全メソッドに、ヘッダー `X-XSRF-TOKEN` を GET・HEAD・OPTIONS 以外に付ける（TRACE は付ける）。トークンがまだないときはプレビューに理由を出す | Spring の Cookie 方式は Cookie とヘッダーの両方を照合する |
+| 手入力が優先 | 有効な手入力の `X-XSRF-TOKEN` ヘッダーがあればヘッダーは足さない。Cookie は、パラメータの Cookie・手入力の Cookie ヘッダー・既定の認証に同じ名前があれば足さない（Cookie ヘッダーは 1 本にまとめる） | 設計書の要件 |
+| 送り先の制限 | 送り先の origin（スキーム・ホスト・ポート）が環境の `baseUrl` の origin と同じときだけ付ける・保存する。`baseUrl` がない環境では、付けも保存もしない（理由をプレビュー・送信結果に出す）。別のサイトにセッションを送らず、別のサイトの `Set-Cookie` でセッションを上書きしない | ブラウザの Cookie がドメインで分かれるのと同じ。手で作ったリクエストで別の URL に送っても漏れない |
+| 環境が未選択 | 付けない・保存しない（グローバルには保存しない）。`Set-Cookie` が来たら `autoUpdateSkipped` に「環境が選ばれていないため…」を入れる。環境 ID を明示して送れば（`RequestInput.environmentId`）その環境に保存する。「グローバル」を環境として指定しても保存しない | グローバルは全環境で共有され、別の環境のセッションを上書きしてしまうため |
+| プレビュー | `autoHeaders` に `Cookie`（出どころ `認証タブ（cookieAuth）`・`CSRF の自動付与`・パラメータの Cookie は `Cookie`。複数は「、」でつなぐ）と `X-XSRF-TOKEN`（出どころ `CSRF の自動付与`）を伏せ字で出す。`RequestPreview.autoNotes` に付かない理由（トークンがまだない・送り先が `baseUrl` と違う・`baseUrl` がない・キーチェーンを読めない）を出す。以前の出どころ `Cookie・認証` は `認証タブ（cookieAuth）`（認証タブの API キー（Cookie））と `Cookie`（パラメータ）に分けた | 画面イメージ（ヘッダー・認証）の文言 |
+| 伏せ字 | 付けた値は `PreparedRequest.secrets` に入る（URL・エラー文・履歴の伏せ字の対象）。`AutoAuth`・`SetCookie`・`CookieChange` の `Debug` は値を出さない。キーチェーンから読んだ値は、保存された変数がシークレットなので、以後も `secret = true` で扱われる | 設計書「秘密の値」 |
+| キーチェーンを読めないとき | 自動化のための読み出しの失敗は、リクエストを止めず、自動化の値だけ諦める（プレビューに理由）。リクエスト自身が使うシークレット（既定の認証の `session` など）の失敗は、これまでどおりエラー | 認証のいらない API まで送れなくならないように |
+
+### 受け取ったとき
+
+| 項目 | 決定 | 理由 |
+| --- | --- | --- |
+| 何を見るか | どのステータスのレスポンスでも、`Set-Cookie` の `SESSION` と `XSRF-TOKEN`（名前は大文字小文字を区別）を見る。同じ名前が複数あれば、あとのものが勝つ。ログインの 2 つ目の API だけではなく、1 段階目（`password-login`）の SESSION も保持する（2 段階目が使うため）。画面イメージの「createEmailCodeLogin・createPasskeyLogin の成功時」より広い | 実際のバックエンドは 1 段階目でもセッションを作る |
+| 消す指示 | 値が空・`Max-Age` が 0 以下・（`Max-Age` がなければ）`Expires` が過去（RFC 1123 と Netscape 形式）なら、環境の値を消す。変数の宣言は残す | ログアウトの `SESSION=; Max-Age=0` |
+| 書き込み | 送信に使った環境の `session` / `xsrfToken` をシークレットとして更新する。変数がなければシークレットとして作る（説明は「自動で更新されます（Set-Cookie）」、有効）。通常の変数だったときはシークレットに変える（元の値は SQLite・WAL に残さない）。有効・無効は変えない。値が変わらなければ書かず、報告にも出さない。消したときは、値があったときだけ `cleared` として報告する。自動更新どうしは直列（`auto_lock`） | シークレットはキーチェーンだけ |
+| 送信結果 | `RequestFinished.autoUpdates`（`name`・`environmentId`・`environmentName`・`action: updated / cleared`。値は出さない）と `autoUpdateSkipped`（`name`・`reason`。環境が選ばれていない・送り元が `baseUrl` と違う・`baseUrl` がない・キーチェーンに書けない）。キーチェーンに書けなくても送信は成功のまま。理由の文は値を伏せる | 画面で「session を更新しました」と出す。更新後は環境の一覧を取り直すこと（変数が増えている） |
+| 画面へ返すレスポンスのヘッダー | `Set-Cookie`・`Cookie`・`Authorization`・`X-XSRF-TOKEN` などの値は `••••` にして返す（`Set-Cookie` は名前と属性を残す。`XSRF-TOKEN=••••; Path=/`）。ほかのヘッダーはそのまま | 画面イメージ（レスポンス・ヘッダー）。M2 の「サーバーが返したまま」は、これらのヘッダーだけ変えた。ヘッダー名はそのまま |
+| 実 API の結合テスト | `cargo test -p nekoreq --test real_api_m5 -- --ignored --nocapture`。環境変数 `NEKOREQ_REAL_EMAIL`・`NEKOREQ_REAL_PASSWORD`（必須）、`NEKOREQ_REAL_API_URL`、`NEKOREQ_MAILPIT_URL`（メール認証コードは Mailpit の API から自動で取る。バックエンドの docker-compose.yml: SES → MiniStack → Mailpit）、`NEKOREQ_REAL_EMAIL_CODE`（手で渡すとき）、`NEKOREQ_REAL_KEEP=1`（登録した取引先を残す） | 認証情報はコードに書かない |
+
+### 持ち越し
+
+| 項目 | 決定 | 理由 |
+| --- | --- | --- |
+| examples の複数保持 | `MediaTypeSpec.examples`（`NamedExample`: `name`・`summary`・`description`・`value`）。`example` があれば名前 `example` で先頭に、続いて `examples` を書かれた順（`$ref` はたどる。`value` のないもの（`externalValue` だけ）は入れない。配列の形は `example 1`・`example 2`…）。`example`（これまでの動き）は先頭の値。`MediaDoc.examples` に同じものを返す（設計タブで切り替えて見る）。保存済みのデータには `examples` がないので空で読む。ハッシュに含まれるので、例の変更は同期の差分（変更）になる。アップデート後の最初の同期では、例のある API が「変更」に出ることがある（保存済みの Operation に例の一覧がないため） | 設計書「例（複数）」 |
+| 同期の確認済みホスト | `openapi_sync_check` / `openapi_sync_apply` に `allowedHosts`（`Option<Vec<String>>`）を足した。`needsConfirmation` の `foreign[].host`（origin）を渡して呼び直す。前後の空白・空は除く。`check` は読み込めたところで、確認したホストを `api_sources.allowed_hosts` に保存する（`apply` は反映と一緒に保存）。以後は渡さなくても確認を求めない | 確認画面で確認した相手を、同期のたびに聞かない |
+| エディタで行番号へ | `editor_open` は、設定のコマンド（`AppSettings.editorCommand`。`app_settings_get` / `app_settings_set`。保存は `app_settings` テーブル（v5）のキー `app`）があればそれだけを使い、なければ VS Code（`code -g file:line`）・Cursor（同）・Sublime（`subl file:line`）・JetBrains（`idea` など `--line N file`）の順に、`PATH` と macOS・Windows・Linux のよくある置き場所から見つかったものを使う。どれもなければ従来どおり OS の既定のアプリ（行番号なし）。コマンドは空白で区切り（`"` `'` で囲める。Windows のパスの `\` はそのまま）、`{file}`（絶対パス）・`{line}`（なければ 1）を各引数の中で置き換える（`{file}` がなければ最後に足す）。シェルを通さず直接起動する。設定のコマンドが起動できなければエラー（ほかには切り替えない）。開けるファイルは、これまでどおり取り込んだファイルの一覧にあるものだけ（`editor_target`） | 設計書「クリックでエディタを開く」。設定画面は M6 |
+| `ForeignRef.host` の説明 | 実際の値（origin の形）に直した。`ApiSource.allowedHosts` の説明も同じ | M4 の修正で中身が origin になっていた |
+
+## 2026-11-17 M6（履歴・cURL の取り込みとコピー・設定画面）
+
+Rust 側だけ（画面は別の担当が bindings を使って作る）。コマンドと型は `src/bindings.ts`。
+
+### 履歴
+
+| 項目 | 決定 | 理由 |
+| --- | --- | --- |
+| 残すもの | 成功・4xx / 5xx・失敗（接続できない `connect`・TLS `tls`・タイムアウト `timeout`・中止 `cancelled`・大きすぎる `tooLarge`・その他 `other`）を送信のたびに 1 件。**送っていないもの**（変数が展開できない・URL やヘッダーが正しくない・ボディのファイルを読めない）は残さない。履歴を作ってから `request://finished` を出す | 画面が結果を受けて一覧を取り直せば、すでに入っている |
+| 保存する中身 | 送った内容（method・展開後の URL・アプリが付けた `User-Agent` / `Accept` / `Accept-Encoding` を含む実際のヘッダー・ボディ）、受け取ったステータス・ヘッダー・ボディ・時間の内訳・最終 URL（URL と違うときだけ）、環境の ID と名前、`opKey` と Operation の summary、送信日時（UTC）、送信に使った元の入力（`input`。`{{変数}}` のままの `RequestSpec`）。ボディは `requestBodyKind`（`none` / `text` / `binary` / `file` / `multipart`）と大きさ・パートの一覧（ファイルは中身を保存せずパスだけ）を持つ。multipart の `requestBody` は、テキストのパートを `name=value` の行にしたもの（検索・簡易表示用） | 設計書「履歴」 |
+| 伏せ字（保存する前） | (1) `Authorization`・`Proxy-Authorization`・`Cookie`・`Set-Cookie`・`X-XSRF-TOKEN` ヘッダーの値（送った・受け取った両方。`redact_headers`）。(2) `PreparedRequest.secrets`（環境のシークレット・自動付与の SESSION / XSRF-TOKEN・Basic の資格情報）に、**そのレスポンスの `Set-Cookie` で受け取った SESSION / XSRF-TOKEN の値**と、**手で認証欄・ヘッダー・Cookie に書かれた値**（`sanitize_spec` の `literals`。Basic のヘッダーは base64 の中身も）を加えたものが現れた箇所すべて（URL・最終 URL・ヘッダー・ボディ・multipart のパート・ボディのファイルのパス・エラー文）。(3) 元の入力（`input`）は手で書かれた認証の値・ヘッダー・Cookie を `••••` にする（`maskedFields` に「認証（Bearer のトークン）」などの名前を残す） | 設計書「伏せ字」と、「手で書いた認証も伏せる」 |
+| 手で書いた値の判定 | `{{変数}}` だけでできた値（`{{token}}`・`Bearer {{token}}`）はテンプレートなのでそのまま。それ以外が認証欄の Bearer のトークン・Basic のパスワード・API キーの値、上記ヘッダー、Cookie パラメータの値に入っていれば伏せる。クエリ・ボディ・ほかのヘッダーに手で書いたシークレットは、名前では見分けられないので対象外（`{{変数}}` で参照するのが決まり） | 平文のシークレットを増やさずに、手入力の邪魔をしない |
+| 変数の上書き | `VarOverride` の値は保存しない（名前だけ `overrideNames`）。再送信では使えない | 値にシークレットが入りうる |
+| 切り詰め | ボディ（送った・受け取った）が 1 MB を超えたら先頭だけ（文字の途中では切らない。`...Truncated` と全体の大きさ `...Size` を残す）。**伏せ字にしてから切る**（切り口をまたぐシークレットの前半を残さない）。設定 `history.omitLargeBodies` をオフにすると全体を保存（受け取るボディは設定の表示上限までなので、その範囲）。元の入力（`input`）の JSON・テキストのボディも 1 MB を超えるなら残さず（`Body::None`）、`maskedFields` に「ボディ（1 MB を超えるため保存していません）」を入れる（再送信・編集して開くでは使えなかったものとして `droppedFields` に出る） | 設計書「1 MB を超えるボディは先頭だけ」 |
+| バイナリ | 受け取ったボディがバイナリ（base64 で返ってくるもの）なら中身は保存しない（`responseBinary`・大きさ・Content-Type だけ） | 履歴が膨らむのを避ける |
+| 件数 | 設定 `history.limit`（1,000 / 5,000 / 0 = 保存しない。既定 1,000）。**プロジェクトごと**に、挿入と同じトランザクションで古いもの（`sent_at`・`seq` の順）から消す。0 のときは残さない（すでにある履歴は消さない）。設定を減らしても、次の送信までは消えない | 履歴は「プロジェクト単位」で見る・消すため |
+| 表 | マイグレーション v6 で `history` を作り直す（それまで書き込む処理はなかったので消える行はない）。軽い列（一覧が読む）を前、重い列（ヘッダー・ボディ・元の入力）を後ろに並べる。索引 `(project_id, sent_at DESC, seq DESC)`。`history_fts`（`url`、`body` = 送ったボディ + 受け取ったボディ）は trigram のまま作り直し、`secure-delete` を有効にする | 一覧が長いボディのオーバーフローページを読まない。消した文字を FTS の領域に残さない |
+| 消す | `history_delete` / `history_clear` / プロジェクト削除のあとに WAL を空にする（`wal_checkpoint(TRUNCATE)`）。`secure_delete` はコネクションで有効（M2 から）。本体・WAL に消した文字列が残らないことをテストで確認 | 「VACUUM は不要」 |
+| 一覧 | `history_list(projectId, query)`。新しい順、既定 100 件・最大 500 件、続きは `nextCursor`（`sent_at\|seq`）。`total` は絞り込みに当てはまる全件。各項目に**ローカルの日付** `localDate` を付ける（画面の日付ごとの区切り）。`query.utcOffsetMinutes`（画面が `-new Date().getTimezoneOffset()` で渡す。なければ OS のタイムゾーン）で日付を決め、期間 `from` / `to`（`YYYY-MM-DD`、その日を含む）もそのタイムゾーンの 0 時で UTC に直す。ステータス `statuses`（`2xx` `3xx` `4xx` `5xx` `failed`。複数は OR）・`environmentId` | 設計書「一覧」 |
+| 全文検索 | 検索語（前後の空白を除く）が 3 文字以上なら FTS5 trigram の phrase（`"` は二重にして記号を無効にする。大文字小文字は区別しない）、3 文字未満は `LIKE '%…%'`（`%` `_` `\` は文字として探す。URL・送ったボディ・受け取ったボディ）。10,000 件（本文つき）で 1 ページ目 約 2 ms・全文検索 約 4 ms・LIKE 約 15 ms・絞り込み 約 6 ms（デバッグビルド） | trigram は 3 文字未満を引けない |
+| 再送信 | `history_resend(id, settings)`。元の入力を**今の環境**（プロジェクトの「選んでいる環境」）で `request_send` と同じに送る（送信 ID をすぐ返し、結果は `request://finished`。新しい履歴ができる）。伏せ字（`••••`）が入った認証・ヘッダー・Cookie の行は外してから送る（`••••` を送らない）。Operation の既定の認証・cookieAuth の自動付与は今の環境の値で付く | 設計書「再送信」 |
+| 編集して開く | `history_open(id)`。元の入力（伏せ字の行は外す）・`opKey`・外したものの名前 `droppedFields`・上書きの名前を返す。`opKey` があればその API のタブに未保存の入力として、なければ新しい「その他」のタブで開く | 設計書「編集して開く（新しいタブ）」 |
+| 入力値として保存 | `history_save_as_input(id, name?)`。`opKey` があれば RequestDraft（同じ `opKey` の入力値を置き換え）、なければ AdHocRequest（名前は指定か `METHOD /path`。200 文字まで）。伏せ字の行・認証は保存しない（`dropped`） | 設計書「入力値として保存」 |
+| cURL としてコピー | `history_curl(id)`。履歴の送った内容（伏せ字済み）から作る。アプリが付けた既定のヘッダーは外す。URL に入った `••••` はそのまま読める形で出す（`%E2%80%A2` にしない） | 貼り付けて読める |
+| 比較 | `history_compare(leftId, rightId)`。ステータス（`200 OK` / `失敗: …`）・ヘッダー（名前の小文字順にそろえた `name: value` の行）・ボディ（JSON は整形して、キーの順は保つ）を `similar`（Myers。2 秒で打ち切り）で行単位に比べる。変わらない行は前後 3 行だけ残して `skip`（「N 行省略」）にする。バイナリは比べない。片側 20,000 行まで。同じなら差は空（`...Changed` が `false`） | 設計書「2 件の比較」 |
+
+### cURL
+
+| 項目 | 決定 | 理由 |
+| --- | --- | --- |
+| `curl_parse(projectId, text, environmentId?)` | `nekoreq-curl` で解析 → `baseUrl` と照合 → Operation と照合。何も保存しない。`target`（`operation` / `adhoc`）・`opKey`・`summary`・`matchedPath`・`request`（そのまま開ける `RequestSpec`）・`baseReplaced`・`environmentId`（ホストが当てはまった環境）・`suggestedName`・`warnings` を返す | 設計書「cURL 取り込み」 |
+| `baseUrl` との照合 | 指定された環境（なければ選んでいる環境）› ほかの環境（作った順）› グローバルの順に、通常の変数 `baseUrl` と照合する（スキーム・ホスト・ポート。`baseUrl` にパスがあればそのパスで始まること）。当てはまれば URL の先頭を `{{baseUrl}}` にする。`baseUrl` が違うホストは置き換えず、「その他」で絶対 URL のまま | 別の環境の cURL を貼っても、そのホストの環境を案内できる |
+| Operation との照合 | **`baseUrl` に置き換えられたときだけ**照合する（別のホストの cURL が、選んでいる環境へ送る API として開かれないように）。取り込み済み（削除されていない）の Operation のうち、method が同じで path テンプレートに当てはまり、`literal_segments` が多いものを優先（同数なら先のもの）。path パラメータの値はパーセントデコードして `params`（`location: path`、有効）に入れる。yaml にあって cURL にないパラメータは、無効の行で並べる（`open_operation` の「入力値あり」で作る）。cURL にだけあるパラメータ・ヘッダーは有効の行で残す。照合できなかった「ホストは違うが path は一致」は、警告で知らせる | 画面の「OpenAPI の createPasswordLogin と一致」 |
+| 警告 | `nekoreq-curl` の警告（無視したオプション `ignored`・知らないオプション `unknown`・扱えない指定 `unsupported`・読み替え `adjusted`）をそのまま返す | 設計書 |
+| `Accept-Encoding` の zstd | Chrome の `Accept-Encoding: gzip, deflate, br, zstd` から `zstd` を外す（空になれば行ごと外す）。外したら警告（`adjusted`） | http クレートが zstd を展開できない |
+| multipart の `;type=` | core の `MultipartPart.content_type`（`Option<String>`。TypeScript では `contentType?: string \| null`）を足した。http の送信ではパートの `Content-Type` に使う（ファイルは指定がなければ拡張子から決める。改行は空白にしてヘッダーを増やせないようにする）。cURL の解析・書き出しも対応（`;type=` の警告は消えた。`;filename=` は従来どおり警告） | M5 のライブラリからの引き継ぎ |
+| `curl_export(input, mode)` | 今の入力を**展開**して（`request_send` と同じ組み立て。cookieAuth・CSRF の自動付与も入る）cURL にする。`mode`: `redacted`（既定。`Authorization`・`Cookie`・`X-XSRF-TOKEN` などの値とシークレットの値を `••••`）/ `raw`（そのまま）。展開できない変数があれば `Validation`（変数名を含む）。書き方は bash（`\` の行継続）固定 | 設計書「cURL としてコピー」 |
+
+### 設定
+
+| 項目 | 決定 | 理由 |
+| --- | --- | --- |
+| `AppSettings` | M5 の `editorCommand` に、`appearance`（`theme`: `dark` / `light` / `system`（既定）・`editorFontSize`: 13 / 14 / 15・`restoreTabs`）、`request`（`timeoutSecs`: 0 で無制限・既定 30、`followRedirects`、`verifyCertificates`、`responseLimit`: `mb10`（既定）/ `mb50` / `unlimited`）、`network`（`proxy`: `mode` `system`（既定）/ `none` / `manual`・`url`・`username`・`hasPassword`・`noProxy`、`caCertPath`、`clientCerts`: `id`・`hostPattern`・`path`・`hasPassword`）、`history`（`limit`・`omitLargeBodies`）を足した。保存は `app_settings` の JSON のまま（足りない項目は既定値）。コマンドは M5 の `app_settings_get` / `app_settings_set`。言語の設定は作らない | 設計書・画面イメージ「設定」 |
+| 検証 | 選択肢にない値（履歴の件数・文字サイズ・10 万秒を超えるタイムアウト）・手動のプロキシで URL が空 / `http(s)` でない / `user:pass@` を含む・読めない CA 証明書（PEM の証明書がないもの）・存在しないクライアント証明書のファイルは `Validation`（保存されず、前の設定が残る）。前後の空白・空のホストは整える。クライアント証明書の `id` は空なら付ける。`hasPassword` は画面から書き換えられない（保存済みの値を引き継ぐ） | |
+| パスワード | プロキシ（`proxy_password_set`）・クライアント証明書（`client_cert_password_set(id, …)`。先に `app_settings_set` で証明書を設定に入れて `id` を決める）のパスワードは**キーチェーンだけ**（サービス `NekoReq/app`、アカウント `proxy/password`・`client-cert/<id>`）。空を渡すと消える。設定から証明書を消すとパスワードも消す。`hasPassword` の印は設定の JSON に持つ（設定を読むたびにキーチェーンを開かない） | 設計書「秘密の値」 |
+| 送信への反映 | `request_send` の `settings` が `null` なら、保存された設定（タイムアウト秒 → ms・リダイレクト・証明書の検証）を使う。渡されたときはその 3 つが優先。プロキシ・CA 証明書・クライアント証明書・表示上限は、いつも保存された設定。`SendSettings`（画面とやりとりする型）は変えていない（画面は `null` を渡す） | 設定を保存しても、画面が固定値を渡していると効かないため |
+| プロキシ | `system`: reqwest の `system-proxy`（macOS・Windows のシステム設定と、環境変数 `HTTP_PROXY` など）。`none`: 使わない（環境変数も無視）。`manual`: URL（ユーザー名・パスワードは別に持ち、`Proxy-Authorization` の Basic で送る）と、通さないホスト（reqwest の `NO_PROXY` 形式）。時間の内訳（DNS・接続・TLS）はプロキシへの接続も含めた接続全体で測る | 設計書 |
+| CA 証明書 | PEM のファイル（複数の証明書を並べてよい）を OS の証明書ストアに**足して**信頼する（`rustls-platform-verifier` の `new_with_extra_roots`）。検証を切っているときは使わない | |
+| クライアント証明書 | `hostPattern`（`*` は何文字でも・大文字小文字は区別しない。`:` が 1 つあれば `host:port` と比べる。例 `*.internal.example`）が**最初の送り先**のホストに当てはまる最初の 1 件を使う。ファイルは `.p12` / `.pfx`（PKCS#12。`p12-keystore`。パスワードはキーチェーン）か PEM（証明書と秘密鍵を同じファイルに）。当てはまる証明書のファイルとキーチェーンだけをそのつど読む（無関係な証明書のためにキーチェーンを開かない）。リダイレクトで別のホストへ飛んでも、同じクライアントなので同じ証明書を（サーバーが求めれば）送る | rustls の `ResolvesClientCert` は送り先のホスト名を受け取れないため |
+| 読めない証明書 | CA 証明書・クライアント証明書のファイルが読めない・パスワードが違うときは、送信の失敗（`SendError::Other`。メッセージは日本語で、パスワードを含まない）。履歴には残さない（送っていない） | |
+| 表示上限 | `responseLimit` → http の `Limits.preview_bytes`（10 MB / 50 MB / 無制限 = 受け取れる上限の 512 MB）。「ファイルに保存」用の全体の保持（直近 8 件）は従来どおり | |
+| yaml の URL の取得 | 取り込み・同期の URL 方式（入口と参照先）も、同じプロキシ・CA 証明書・クライアント証明書で取得する（`LoadParams.transport`。クライアント証明書はすべて読み、取得する URL ごとにホストで選ぶ） | 設計書 |
+| 設定画面のほかの項目 | 「プロジェクトの既定の保存先」「ショートカット」「アップデートを確認」は、この担当の範囲外（作っていない） | |
+
+### リダイレクト（M5 の持ち越し）
+
+| 項目 | 決定 | 理由 |
+| --- | --- | --- |
+| 自前で追う | http クレートがリダイレクトを自分で追う（reqwest のポリシーは `none`）。最大 10 回（超えたら「リダイレクトを追えません: リダイレクトが 10 回を超えました」）。301・302 の POST と 303（HEAD・GET 以外）は GET にしてボディと `Content-Type` などを外し、307・308 はメソッドとボディをそのまま送り直す。`Location` が読めない・http(s) でないときは、その 3xx をそのまま返す。時間の内訳は最後の区間 | 別の origin に `X-XSRF-TOKEN` を送らないため（reqwest のポリシーはヘッダーを触れない） |
+| 外すヘッダー | **別の origin**（スキーム・ホスト・ポートのどれかが違う）へのリダイレクトでは、`Authorization`・`Cookie`・`Proxy-Authorization`・`X-XSRF-TOKEN` を外す（ほかのヘッダーは送る）。同じ origin では付けたまま。reqwest の自動の `Referer` は付かなくなった | 設計書「CSRF」・M5 の持ち越し |
+
+### タブの復元
+
+| 項目 | 決定 | 理由 |
+| --- | --- | --- |
+| コマンド | `session_save(projectId, session)`（置き換え。保存した内容を `savedAt` つきで返す）・`session_load(projectId)`（なければ `null`）。マイグレーション v6 の `sessions`（プロジェクトごとに JSON 1 件。プロジェクトを消すと一緒に消える）。タブは 200 個まで（超えると `Validation`） | 設計書「起動 2 秒以内に前回のタブを復元」 |
+| 中身 | `tabs`（`id`・`kind`: `operation` / `adhoc` / `new`・`opKey`・`adhocId`・`title`・`request`（未保存の入力。変えていなければ `null`、`new` は常にある）・`dirty`・`viewState`（画面が決める文字列。Rust は見ない）・`droppedFields`）と `activeTabId`。`AppSettings.appearance.restoreTabs` が `false` のとき復元するかどうかは画面が決める（保存はいつもする。`session_load` は設定を見ない） | |
+| シークレット | 未保存の入力のうち、**手で書かれた認証の値**（認証欄の Bearer のトークン・Basic のパスワード・API キー、`Authorization` / `Proxy-Authorization` / `Cookie` / `X-XSRF-TOKEN` ヘッダー、Cookie の値）は**保存しない**。空文字にして、空にしたものの名前を `droppedFields` に残す（画面は「認証の値は復元されません」と出す）。`{{変数}}` で参照したものは残る。変数の上書きはもともと入力に含まれない。テスト: 値が SQLite のファイルに残らない | 履歴の伏せ字と同じ考え方。履歴は表示用に `••••`、こちらは復元して送るものなので空にする（`••••` を送らない） |
+| 速さ | 50 タブ（うち 1 つは 1 MB の本文）で、保存 約 40 ms・読み込み 約 4 ms（デバッグビルド） | |
+
+### 実装上の注意
+
+- `nekoreq-http` に `Transport`（プロキシ・CA・クライアント証明書・上限）と `send_with_transport` / `fetch_bytes_with` を足した。`send` / `send_with_limits` / `fetch_bytes` / `fetch_bytes_at` は従来どおり（プロキシなし・OS の証明書ストアだけ）。reqwest の features に `system-proxy` を足した。新しい依存: `p12-keystore`（PKCS#12。RustCrypto の rc 版に依存）・`similar`（差分）。
+- コンテナ（Linux）では、macOS・Windows の OS のプロキシ設定（`system-proxy`）の読み取りと、macOS 向けのビルドは確かめていない（環境変数 `HTTP_PROXY` の読み取りだけテスト）。
+- `cargo test --workspace` は、同時にリンクするテストが多いとコンテナのメモリを使い切ることがある（`ld` が `Killed`）。そのときは `-j 2` を付ける。
+
+## 2026-11-17 M5・M6 の修正（テスト担当の指摘への対応）
+
+### 仕様の決定
+
+| 項目 | 決定 | 理由 |
+| --- | --- | --- |
+| localhost はプロキシを通さない | プロキシが「OS の設定を使う」と「手動」のとき、`localhost`・`*.localhost`・`127.0.0.0/8`・`::1` への送信は、環境変数・OS の設定の `NO_PROXY` に書かれていなくても、常にプロキシを通さない（「使わない」は元から通さない）。yaml の URL の取得（取り込み・同期）も同じ。「OS の設定を使う」は、reqwest が内部で使う設定の読み取り（`hyper-util` の `Matcher::from_system`。OS の設定と `HTTP_PROXY` など。`NO_PROXY` も従う）を直接呼び、`Proxy::custom` でループバックだけ外す。環境変数に書かれた認証（`http://user:pw@host:port`）はそのまま送る。設定の読み取りはクライアントを作るとき（送信ごと） | ローカルの API を叩くアプリなので、会社のプロキシ環境でも localhost は直接つなぐ |
+| `Set-Cookie` の見方 | `Domain`・`Path`・`SameSite` は見ない。送り先が環境の `baseUrl` と同じ origin かどうかだけで決める（今の動き）。`Secure` 付きを http で受け取っても保存する（開発環境の http を想定）。テスト `set_cookie_domain_path_and_secure_attributes_are_ignored_today` で固定 | ブラウザの Cookie の完全な再現はしない |
+| リダイレクトの途中の `Set-Cookie` | 追従の途中（301・302・303・307・308）のレスポンスの `Set-Cookie` も読み、`SESSION`・`XSRF-TOKEN` を環境に保存する（順に読み、あとのものが勝つ。送り元の origin は各レスポンスの URL で `baseUrl` と比べる）。追従先のリクエストには、**同じ origin のとき**、新しい `SESSION`・`XSRF-TOKEN`（Cookie ヘッダー）を付け、`X-XSRF-TOKEN` は（GET・HEAD・OPTIONS 以外か、すでに付いているとき）更新する。消す指示なら外す。別の origin へ追従するときは付けない（今までどおり Cookie などを外す）。自動化の対象の origin・オン/オフは `Transport.redirect_cookies` で渡し、途中のレスポンスの `Set-Cookie` は `SentResponse.redirect_hops` で返す（`ResponseData`・画面へ返す型は変えていない）。履歴の伏せ字にも途中で受け取った値を含める | ログイン後の 302 で発行されたセッションを失わない |
+| 自動更新の確認のプロキシ | 設定の手動プロキシ（URL・ユーザー名・パスワード）を、updater の確認とダウンロードにも使う（`UpdaterBuilder::proxy`）。「使わない」は `no_proxy`、「OS の設定を使う」はプラグインの既定。**CA 証明書・クライアント証明書は updater プラグインに渡す口がないので効かない** | 社内プロキシ越しでも更新を確認できるように |
+| updater のコマンド | `update_check`・`update_install`・`update_restart` と内部の関数を `R: tauri::Runtime` で総称にした（`bindings.ts` には `Wry` で出す。形は変わらない）。モックのランタイムで、`update_install` を更新なしで呼んだときのエラー（「入れ替える新しい版はありません」）・debug ビルドでは起動時の確認をしないこと・確認のエラー文に URL のクエリを出さないことをテストする。エラー文（確認・入れ替え）から URL のユーザー情報・クエリ・フラグメントを落とす | テストできるように。将来 endpoint にトークンを入れても出ない |
+| タブの復元 | 保存された JSON に読めないタブ（知らない `kind` など）があっても、読めるタブは復元する。読めなかった数は標準エラーに記録する（`SessionState` に知らせる項目がなく、型を変えないため）。選んでいたタブが読めなかったときは選んでいるタブなし。`session_save` は、受け取ったタブの `droppedFields` と今回空にしたものの和集合を保存する（復元したタブを保存し直しても知らせが消えない） | 1 つの不具合で前回のタブが全部消えない |
+| 履歴の記録の失敗 | 記録に失敗したら標準エラーに記録する（シークレットは伏せる）。送信の結果は変えない | 失敗に気づけるように |
+
+### 伏せ字・保存の修正
+
+| 項目 | 決定 | 理由 |
+| --- | --- | --- |
+| 伏せ字の探す形 | 値の前後の空白を除いた形（4 文字以上のとき。ヘッダーの値は HTTP で前後の空白が落ちる）、JSON の文字列のエスケープ形（`\"`・`\\`・`\/`・非 ASCII だけ／すべての `\uXXXX`（16 進は大文字・小文字））、base64（標準・URL セーフ、パディングあり・なし。4 文字以上のとき）を、これまでの形（そのまま・URL・フォーム）に加えた。4 文字未満の値からは、空白除きと base64 の形を作らない（関係のない文字列まで伏せないため）。値の途中に埋まった base64（前の文字との境目で 3 バイトの区切りがずれたもの）は探さない | 設計書「値が現れた箇所」 |
+| ヘッダー名 | `redact_headers` はヘッダー名に入ったシークレットも伏せる（`X-{{token}}`） | |
+| URL のユーザー情報 | URL の `user:pass@` にシークレットが入っているとき、reqwest が送る `Authorization: Basic base64(user:pass)` の base64 と `user:pass` も伏せ字の対象（`PreparedRequest.secrets`）に入れる | サーバーがヘッダーをエコーしても履歴に残さない |
+| 10 MB の切り口 | 受け取るときの表示上限で切れたボディは、伏せ字にしたあと、末尾がシークレットの先頭の断片（1 文字以上）と一致していたらその部分を落とす（履歴の 1 MB の切り詰めは、伏せ字のあとに切るので従来どおり） | 切り口をまたぐシークレットの前半を残さない |
+| 保存済みの設定の読み込み | 保存された設定の JSON の 1 項目が不正でも、ほかの正しい項目は残し、不正な項目だけ既定値に戻す（配列は読める要素だけ残す）。JSON として読めなければ全体が既定値 | 1 項目の不具合でプロキシ・証明書の設定が消えない |
+| `Expires` | RFC 6265 5.1.1 の寛容な読み方（区切り文字で分けた語から時刻・日・月名・年を拾う。asctime 形式・`UTC` などのタイムゾーン・1 桁の時刻・2 桁の年）。読めない日付は今までどおり無視 | 標準でない形の過去の日付でも消す指示として扱う |
+| 検索語の NUL | 履歴の検索語から NUL（U+0000）を取り除く | FTS5 の構文エラーになる |
+| 件数の上限で消した行 | 上限で行を消したとき（そのときだけ）WAL を空にする（`wal_checkpoint(TRUNCATE)`）。手動の削除と同じ | 消した行の文字を WAL に残さない |
+
+### 画面側で決めたこと
+
+| 項目 | 決定 |
+| --- | --- |
+| 履歴の再送信 | 元の入力をタブで開いてから送り、結果はメインのレスポンス欄に出す |
+| 設定の保存 | 保存ボタンなしの自動保存（文字入力は欄を離れたとき） |
+| ショートカット | Ctrl/Cmd+T は新規作成ダイアログを開く |
+| 認証タブの注記 | 「レスポンスの SESSION を環境の session に保存し、次のリクエストの Cookie に付ける」（どのレスポンスの `Set-Cookie` でも更新するため） |
+| テーマ | `localStorage` にも覚え、起動時の最初の描画から反映する |
+
+### macOS のメニュー
+
+| 項目 | 決定 | 理由 |
+| --- | --- | --- |
+| アプリのメニュー | macOS では `src-tauri/src/menu.rs` でメニューを明示的に作る（アプリメニュー: NekoReq について・隠す・ほかを隠す・すべてを表示・終了 Cmd+Q／編集メニュー: 取り消し・やり直し・切り取り・コピー・貼り付け・すべてを選択）。**Close Window（Cmd+W）と設定（Cmd+,）はメニューに置かない**。Windows・Linux はメニューバーを出さない。単体テストでメニューの中身（Close Window・設定がない）を確かめる。macOS の実機では目視していない | メニューが先にキーを取ると、画面のショートカット（タブを閉じる・設定を開く）に届かない |
+
+### 実装上の注意（追加）
+
+- `nekoreq-http` の依存に `hyper-util`（`client-proxy`・`client-proxy-system`。reqwest がすでに使っているものと同じ版）・`http`・`base64`・`chrono` を足した（新しいクレートは増えない）。
+- テスト担当の BUG の `#[ignore]` は外した。残る `#[ignore]` は `updater_config_has_no_placeholders_left`（RELEASE: 公開前に docs/07 の置き換え値を入れる。ユーザーが入れるもの）と、ホストの API を使うテストだけ。

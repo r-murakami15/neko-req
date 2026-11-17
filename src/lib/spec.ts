@@ -1,13 +1,6 @@
-import type { AdHocRequest, Body, KeyValue, ParamDoc, ParamIn, ParamRef, RequestSpec, SendSettings } from "../bindings";
+import type { AdHocRequest, Body, KeyValue, ParamDoc, ParamIn, ParamRef, RequestSpec } from "../bindings";
 
 export const METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"] as const;
-
-/** v1 の設定画面（M6）ができるまでの送信の既定値。 */
-export const DEFAULT_SEND_SETTINGS: SendSettings = {
-  timeoutMs: 30_000,
-  followRedirects: true,
-  verifyCertificates: true,
-};
 
 export const NEW_REQUEST_NAME = "新しいリクエスト";
 

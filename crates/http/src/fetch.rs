@@ -1,6 +1,7 @@
 //! 設定ファイル（OpenAPI の yaml）の取得。送信（`send`）とは別の、単純な GET。
 //!
-//! - TLS は送信と同じ設定（rustls + OS の証明書ストア）。プロキシは使わない。
+//! - TLS は送信と同じ設定（rustls + OS の証明書ストア）。プロキシ・CA 証明書・クライアント証明書は
+//!   `Transport`（設定画面の値）を渡したときだけ使う（`fetch_bytes` / `fetch_bytes_at` は何も足さない）。
 //! - アクセストークンは `Authorization: Bearer` で送る。リダイレクト先が別のホストのときは reqwest が
 //!   `Authorization` を外す。
 //! - エラーの文にはトークンも URL のクエリも載せない。
@@ -11,6 +12,7 @@ use bytes::BytesMut;
 
 use crate::timing::Recorder;
 use crate::tls;
+use crate::transport::Transport;
 
 /// 取得の失敗。`message` は画面に出せる日本語（URL のクエリ・ユーザー情報は含まない）。
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -60,17 +62,34 @@ pub async fn fetch_bytes_at(
     timeout: Duration,
     max_bytes: usize,
 ) -> Result<(Vec<u8>, url::Url), FetchError> {
+    fetch_bytes_with(url, bearer_token, timeout, max_bytes, &Transport::default()).await
+}
+
+/// `fetch_bytes_at` に、プロキシ・CA 証明書・クライアント証明書（`Transport`）を指定する版。
+pub async fn fetch_bytes_with(
+    url: &url::Url,
+    bearer_token: Option<&str>,
+    timeout: Duration,
+    max_bytes: usize,
+    transport: &Transport,
+) -> Result<(Vec<u8>, url::Url), FetchError> {
     let shown = clean_url(url);
     let fail = |message: String, status: Option<u16>| FetchError { message, status };
 
-    let tls = tls::client_config(true, Recorder::new())
-        .map_err(|m| fail(format!("{m}（{shown}）"), None))?;
-    let client = reqwest::Client::builder()
-        .no_proxy()
+    let tls = tls::client_config(
+        true,
+        Recorder::new(),
+        &transport.ca_certs,
+        transport.identity_for(url),
+    )
+    .map_err(|m| fail(format!("{m}（{shown}）"), None))?;
+    let builder = reqwest::Client::builder()
         .timeout(timeout)
         .redirect(reqwest::redirect::Policy::limited(10))
         .user_agent(nekoreq_core::DEFAULT_USER_AGENT)
-        .tls_backend_preconfigured(tls)
+        .tls_backend_preconfigured(tls);
+    let client = crate::apply_proxy(builder, &transport.proxy)
+        .map_err(|e| fail(e.message().to_string(), None))?
         .build()
         .map_err(|e| {
             fail(

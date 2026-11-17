@@ -591,6 +591,7 @@ async fn refs_escaping_the_staged_copy_must_not_read_host_files() {
         token: None,
         allowed_hosts: vec![],
         root: Some(staged.path().to_path_buf()),
+        transport: None,
     })
     .await;
     match r {
@@ -645,6 +646,7 @@ async fn a_root_allows_refs_inside_and_blocks_relative_and_file_url_escapes() {
                 token: None,
                 allowed_hosts: vec![],
                 root: Some(root.clone()),
+                transport: None,
             })
             .await
         }
@@ -693,6 +695,7 @@ mod url_mode {
             token: token.map(String::from),
             allowed_hosts: allowed,
             root: None,
+            transport: None,
         }
     }
 

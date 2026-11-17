@@ -5,16 +5,19 @@
 //!   ファイルに残らないよう、`secure_delete` を有効にし、環境の保存のたびに WAL を空にする。
 //! - リポジトリ関数: プロジェクト（M1）、環境と変数・手で作ったリクエスト（AdHocRequest）・
 //!   入力値（RequestDraft）（M2）、取り込み元（ApiSource）と Operation のキャッシュ・同期の反映（M3・M4）。
-//!   履歴の関数は M6 で足す。
+//!   履歴・タブの復元は M6（`history`・`sessions`）。
 //! - プロジェクトを作ると「グローバル」環境（`environments.is_global`）も 1 つ作る。
 
 mod adhoc;
 mod drafts;
 mod environments;
 mod error;
+mod history;
 mod migrations;
 mod operations;
 mod projects;
+mod sessions;
+mod settings;
 
 use std::path::Path;
 use std::sync::{Mutex, MutexGuard};
@@ -22,6 +25,7 @@ use std::sync::{Mutex, MutexGuard};
 use rusqlite::Connection;
 
 pub use error::{Result, StorageError};
+pub use history::{HistoryFilter, HistoryRows};
 pub use migrations::LATEST_VERSION;
 pub use operations::{ApplyReport, Selection, StaleParam, StoredOperation};
 
@@ -93,3 +97,7 @@ mod tests;
 mod tests_m2;
 #[cfg(test)]
 mod tests_m3;
+#[cfg(test)]
+mod tests_m5;
+#[cfg(test)]
+mod tests_m6;

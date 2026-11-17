@@ -2,7 +2,15 @@ import type {
   AdHocRequest,
   AppError,
   AppInfo,
+  AppSettings,
+  CurlExportMode,
+  CurlImport,
   Environment,
+  HistoryDiff,
+  HistoryEntry,
+  HistoryOpen,
+  HistoryPage,
+  HistoryQuery,
   ImportRequest,
   ImportResult,
   OpKey,
@@ -11,16 +19,21 @@ import type {
   OperationOpen,
   PreviewResult,
   Project,
+  ProjectSettings,
   RequestDraft,
   RequestFinished,
   RequestInput,
   RequestPreview,
   Result,
+  SavedInput,
   SendSettings,
+  SessionState,
   SourceChanged,
   SourceInput,
   SyncApplyResult,
   SyncCheckResult,
+  UpdateInfo,
+  UpdateProgress,
   UploadInput,
 } from "../bindings";
 
@@ -29,6 +42,9 @@ export type FileDropEvent = { type: "over" } | { type: "leave" } | { type: "drop
 
 /** 取り込みダイアログで選ぶものの種類。 */
 export type PickKind = "openapi-file" | "folder" | "files";
+
+/** 設定画面で選ぶ証明書ファイルの種類。 */
+export type CertKind = "ca" | "client";
 
 /**
  * 画面が Rust（または Tauri の外ではモック）を呼ぶための窓口。
@@ -41,7 +57,10 @@ export interface Backend {
   projectRename(id: string, name: string): Promise<Project>;
   projectDelete(id: string): Promise<void>;
 
-  /** 送信を始めて送信 ID を返す。結果は `onRequestFinished` で届く（戻り値より先に届くことがある）。 */
+  /**
+   * 送信を始めて送信 ID を返す。結果は `onRequestFinished` で届く（戻り値より先に届くことがある）。
+   * `settings` が `null` なら、設定画面で保存した値（タイムアウト・リダイレクト・証明書の検証）を使う。
+   */
   requestSend(input: RequestInput, settings: SendSettings | null): Promise<string>;
   requestCancel(sendId: string): Promise<boolean>;
   requestPreview(input: RequestInput): Promise<RequestPreview>;
@@ -71,8 +90,9 @@ export interface Backend {
   // ---- OpenAPI の取り込みと同期（M3・M4） ----
   openapiPreview(source: SourceInput, projectId: string | null): Promise<PreviewResult>;
   openapiImport(request: ImportRequest): Promise<ImportResult>;
-  openapiSyncCheck(projectId: string, upload: UploadInput | null): Promise<SyncCheckResult>;
-  openapiSyncApply(projectId: string, upload: UploadInput | null): Promise<SyncApplyResult>;
+  /** `allowedHosts`: 別のホストの参照を読んでよいと確認した origin（`needsConfirmation` の `foreign[].host`）。 */
+  openapiSyncCheck(projectId: string, upload: UploadInput | null, allowedHosts?: string[] | null): Promise<SyncCheckResult>;
+  openapiSyncApply(projectId: string, upload: UploadInput | null, allowedHosts?: string[] | null): Promise<SyncApplyResult>;
   /** パス方式: 全ファイルの更新日時だけを見る（読み直さない）。 */
   openapiSourceChanged(projectId: string): Promise<SourceChanged>;
   operationList(projectId: string): Promise<OperationListItem[]>;
@@ -83,6 +103,44 @@ export interface Backend {
   editorOpen(projectId: string, file: string, line: number | null): Promise<void>;
   draftSave(draft: RequestDraft): Promise<RequestDraft>;
   draftGet(projectId: string, opKey: OpKey): Promise<RequestDraft | null>;
+
+  // ---- 認証の自動化・設定（M5・M6） ----
+  projectSettingsSet(projectId: string, settings: ProjectSettings): Promise<Project>;
+  appSettingsGet(): Promise<AppSettings>;
+  appSettingsSet(settings: AppSettings): Promise<AppSettings>;
+  /** プロキシのパスワード（キーチェーン）。空で消す。返り値は `hasPassword` が変わった設定。 */
+  proxyPasswordSet(password: string): Promise<AppSettings>;
+  /** クライアント証明書のパスワード（キーチェーン）。先に `appSettingsSet` で証明書を入れて `id` を決めておく。 */
+  clientCertPasswordSet(id: string, password: string): Promise<AppSettings>;
+  /** 証明書ファイルを選ぶダイアログ。選ばなければ `null`。 */
+  pickCertFile(kind: CertKind): Promise<string | null>;
+
+  // ---- 履歴・cURL・タブの復元（M6） ----
+  historyList(projectId: string, query: HistoryQuery): Promise<HistoryPage>;
+  historyGet(id: string): Promise<HistoryEntry>;
+  historyDelete(id: string): Promise<void>;
+  /** プロジェクトの履歴をすべて消す。消した件数を返す。 */
+  historyClear(projectId: string): Promise<number>;
+  historyOpen(id: string): Promise<HistoryOpen>;
+  /** 元の入力を今の環境で送り直す。送信 ID を返し、結果は `onRequestFinished` で届く。 */
+  historyResend(id: string, settings: SendSettings | null): Promise<string>;
+  historySaveAsInput(id: string, name: string | null): Promise<SavedInput>;
+  historyCurl(id: string): Promise<string>;
+  historyCompare(leftId: string, rightId: string): Promise<HistoryDiff>;
+  curlParse(projectId: string, text: string, environmentId: string | null): Promise<CurlImport>;
+  curlExport(input: RequestInput, mode: CurlExportMode): Promise<string>;
+  sessionSave(projectId: string, session: SessionState): Promise<SessionState>;
+  sessionLoad(projectId: string): Promise<SessionState | null>;
+
+  // ---- 自動更新（M7） ----
+  updateCheck(): Promise<UpdateInfo | null>;
+  updatePending(): Promise<UpdateInfo | null>;
+  updateInstall(): Promise<void>;
+  updateRestart(): Promise<void>;
+  /** `update://available` の購読。解除する関数を返す。 */
+  onUpdateAvailable(handler: (info: UpdateInfo) => void): Promise<() => void>;
+  /** `update://progress` の購読。解除する関数を返す。 */
+  onUpdateProgress(handler: (progress: UpdateProgress) => void): Promise<() => void>;
 
   /** 取り込み元を選ぶダイアログ。選ばなければ空の配列。 */
   pickPaths(kind: PickKind): Promise<string[]>;

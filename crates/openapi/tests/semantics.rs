@@ -557,7 +557,6 @@ async fn examples_example_and_the_example_source_are_distinguished() {
     );
 }
 
-#[ignore = "BUG: M5 で対応（examples の複数保持は MediaTypeSpec.example を複数にする型の変更が要り、src/bindings.ts が変わるため今回は見送り）。設計書の「例（複数）」が設計タブに出ない"]
 #[tokio::test]
 async fn all_named_examples_are_kept() {
     let (_d, e) = spec(
@@ -569,6 +568,91 @@ async fn all_named_examples_are_kept() {
         blob.contains("\"n\":2"),
         "2 つ目の例が保存されていない: {blob}"
     );
+    let media = &op(&l, "a").request_body.as_ref().unwrap().content[0];
+    let names: Vec<_> = media.examples.iter().map(|x| x.name.as_str()).collect();
+    assert_eq!(names, vec!["first", "second"]);
+    assert_eq!(media.examples[1].value, json!({"n": 2}));
+    // `example` は先頭と同じ（これまでの動き）
+    assert_eq!(media.example, Some(json!({"n": 1})));
+}
+
+#[tokio::test]
+async fn examples_keep_summary_description_refs_and_array_form_and_skip_external_values() {
+    let (_d, e) = spec(
+        "paths:\n  /a:\n    post:\n      operationId: a\n      requestBody:\n        content:\n          application/json:\n            example: {n: 0}\n            examples:\n              plain:\n                summary: 普通\n                description: 説明です\n                value: {n: 1}\n              viaRef: {$ref: '#/components/examples/Shared'}\n              external: {externalValue: 'https://example.com/x.json'}\n              broken: {$ref: '#/components/examples/Nope'}\n            schema: {type: object}\n      responses:\n        '200':\n          description: ok\n          content:\n            text/plain:\n              examples: [first, second]\n              schema: {type: string}\ncomponents:\n  examples:\n    Shared: {summary: 共通, value: {n: 3}}\n",
+    );
+    let l = loaded(&e).await;
+    let o = op(&l, "a");
+    let media = &o.request_body.as_ref().unwrap().content[0];
+    let got: Vec<_> = media
+        .examples
+        .iter()
+        .map(|x| (x.name.as_str(), x.value.clone()))
+        .collect();
+    assert_eq!(
+        got,
+        vec![
+            ("example", json!({"n": 0})),
+            ("plain", json!({"n": 1})),
+            ("viaRef", json!({"n": 3})),
+        ]
+    );
+    assert_eq!(media.examples[1].summary.as_deref(), Some("普通"));
+    assert_eq!(media.examples[1].description.as_deref(), Some("説明です"));
+    assert_eq!(media.examples[2].summary.as_deref(), Some("共通"));
+    // `example` と `examples` の両方があれば `example` が先頭
+    assert_eq!(media.example, Some(json!({"n": 0})));
+    // 配列で書かれた例
+    let r = &o.responses[0].content[0];
+    let got: Vec<_> = r
+        .examples
+        .iter()
+        .map(|x| (x.name.as_str(), x.value.clone()))
+        .collect();
+    assert_eq!(
+        got,
+        vec![
+            ("example 1", json!("first")),
+            ("example 2", json!("second"))
+        ]
+    );
+}
+
+#[tokio::test]
+async fn design_tab_lists_every_example_and_changing_one_counts_as_a_change() {
+    let body = |second: i32| {
+        format!(
+            "paths:\n  /a:\n    post:\n      operationId: a\n      requestBody:\n        content:\n          application/json:\n            examples:\n              first: {{value: {{n: 1}}}}\n              second: {{value: {{n: {second}}}}}\n            schema: {{type: object}}\n      responses:\n        '200': {{description: ok}}\n"
+        )
+    };
+    let (_d, e) = spec(&body(2));
+    let l = loaded(&e).await;
+    let detail = describe_operation(op(&l, "a"), &l.meta, &ImportOptions::default(), None, false);
+    let media = &detail.request_body.as_ref().unwrap().contents[0];
+    assert_eq!(media.examples.len(), 2);
+    assert_eq!(media.examples[1].name, "second");
+    // 表示する例は先頭の yaml の例（出どころは yaml）
+    assert_eq!(media.example, Some(json!({"n": 1})));
+    assert_eq!(media.example_source, Some(ExampleSource::Yaml));
+    // example が 1 つもないメディア型は空
+    let (_d2, e2) = spec(
+        "paths:\n  /b:\n    post:\n      operationId: b\n      requestBody:\n        content:\n          application/json:\n            schema: {type: object}\n      responses:\n        '200': {description: ok}\n",
+    );
+    let l2 = loaded(&e2).await;
+    let d2 = describe_operation(
+        op(&l2, "b"),
+        &l2.meta,
+        &ImportOptions::default(),
+        None,
+        false,
+    );
+    assert!(d2.request_body.unwrap().contents[0].examples.is_empty());
+
+    // 2 つ目の例だけを書き換えたら、差分に「変更」で出る
+    let (_d3, e3) = spec(&body(9));
+    let l3 = loaded(&e3).await;
+    let diff = diff_operations(&l.operations, &l3.operations, &HashSet::new());
+    assert_eq!(diff.changed.len(), 1, "{diff:?}");
 }
 
 #[test]

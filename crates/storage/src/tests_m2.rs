@@ -651,11 +651,13 @@ fn adhoc_body_variants_round_trip() {
                 name: "f".into(),
                 value: MultipartValue::File("/tmp/x".into()),
                 enabled: true,
+                content_type: None,
             },
             MultipartPart {
                 name: "t".into(),
                 value: MultipartValue::Text("v".into()),
                 enabled: false,
+                content_type: None,
             },
         ]),
         Body::Binary("/tmp/y.bin".into()),

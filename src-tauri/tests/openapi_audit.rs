@@ -138,7 +138,7 @@ fn touch(p: &Path, secs_from_now: i64) {
 }
 
 async fn sync_check(f: &Fx, id: &str) -> SyncCheckResult {
-    f.state.openapi_sync_check(id, None).await.unwrap()
+    f.state.openapi_sync_check(id, None, None).await.unwrap()
 }
 
 async fn sync_diff(f: &Fx, id: &str) -> SyncDiff {
@@ -149,7 +149,7 @@ async fn sync_diff(f: &Fx, id: &str) -> SyncDiff {
 }
 
 async fn sync_apply(f: &Fx, id: &str) -> (SyncDiff, nekoreq_lib::openapi::ImportReport) {
-    match f.state.openapi_sync_apply(id, None).await.unwrap() {
+    match f.state.openapi_sync_apply(id, None, None).await.unwrap() {
         SyncApplyResult::Applied { diff, report, .. } => (diff, report),
         other => panic!("反映できるはず: {other:?}"),
     }
@@ -177,6 +177,7 @@ fn debug_output_of_inputs_that_carry_a_token_does_not_show_it() {
         token: Some("TOKEN-VALUE-XYZ".into()),
         allowed_hosts: vec![],
         root: None,
+        transport: None,
     };
     assert!(!format!("{p:?}").contains("TOKEN-VALUE-XYZ"), "LoadParams");
 }
@@ -472,7 +473,11 @@ async fn reuploading_replaces_the_copy_and_does_not_keep_removed_files() {
         paths: vec![d.path().display().to_string()],
         entry: None,
     };
-    let r = f.state.openapi_sync_apply(&p.id, Some(up)).await.unwrap();
+    let r = f
+        .state
+        .openapi_sync_apply(&p.id, Some(up), None)
+        .await
+        .unwrap();
     let SyncApplyResult::Applied { diff, .. } = r else {
         panic!("{r:?}")
     };
@@ -492,7 +497,11 @@ async fn reuploading_replaces_the_copy_and_does_not_keep_removed_files() {
         paths: vec![d.path().display().to_string()],
         entry: None,
     };
-    let r = f.state.openapi_sync_apply(&p.id, Some(up)).await.unwrap();
+    let r = f
+        .state
+        .openapi_sync_apply(&p.id, Some(up), None)
+        .await
+        .unwrap();
     assert!(matches!(r, SyncApplyResult::Blocked { .. }), "{r:?}");
     assert!(dest.join("a.yaml").exists());
     assert_eq!(f.state.operation_list(&p.id).unwrap().len(), 2);
@@ -663,7 +672,7 @@ async fn a_blocked_sync_leaves_operations_files_and_drafts_exactly_as_they_were(
             SyncCheckResult::Blocked { problems } => assert!(!problems.is_empty(), "{name}"),
             other => panic!("{name}: 止まるはず: {other:?}"),
         }
-        match f.state.openapi_sync_apply(&p.id, None).await.unwrap() {
+        match f.state.openapi_sync_apply(&p.id, None, None).await.unwrap() {
             SyncApplyResult::Blocked { problems } => {
                 for pr in &problems {
                     assert!(!pr.describe().is_empty());

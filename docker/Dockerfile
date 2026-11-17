@@ -34,6 +34,6 @@ RUN rustup component add rustfmt clippy \
 # macOS SDK は名前付きボリュームに置く（scripts/build-mac.sh 参照）
 ENV SDKROOT=/opt/macos-sdk/MacOSX.sdk \
     CARGO_TARGET_DIR=/cargo-target \
-    MACOSX_DEPLOYMENT_TARGET=13.0
+    MACOSX_DEPLOYMENT_TARGET=10.15
 
 WORKDIR /work

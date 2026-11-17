@@ -9,6 +9,7 @@ export function Header({ projects, current }: { projects: Project[]; current: Pr
   const select = useSelectEnvironment(current.id);
   const setScreen = useUiStore((s) => s.setScreen);
   const setImportDialogOpen = useUiStore((s) => s.setImportDialogOpen);
+  const setSettingsDialogOpen = useUiStore((s) => s.setSettingsDialogOpen);
   const choices = (envs.data ?? []).filter((e) => !e.isGlobal);
 
   return (
@@ -51,7 +52,7 @@ export function Header({ projects, current }: { projects: Project[]; current: Pr
         <DownloadIcon />
         OpenAPI取り込み
       </button>
-      <button type="button" className="btn btn-icon" disabled aria-label="設定（M6 で実装）" title="設定は M6 で実装">
+      <button type="button" className="btn btn-icon" aria-label="設定" title="設定" onClick={() => setSettingsDialogOpen(true)}>
         <GearIcon />
       </button>
     </header>

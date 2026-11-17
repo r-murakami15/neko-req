@@ -8,7 +8,7 @@ use rusqlite::Connection;
 use crate::error::{Result, StorageError};
 
 /// 版 N への移行 SQL は `MIGRATIONS[N - 1]`。
-pub(crate) const MIGRATIONS: &[&str] = &[V1, V2, V3, V4];
+pub(crate) const MIGRATIONS: &[&str] = &[V1, V2, V3, V4, V5, V6];
 
 /// このアプリが対応する最新のスキーマの版。
 pub const LATEST_VERSION: u32 = MIGRATIONS.len() as u32;
@@ -198,6 +198,90 @@ ALTER TABLE api_sources ADD COLUMN meta_json TEXT NOT NULL DEFAULT '{}';
 ALTER TABLE operations ADD COLUMN imported INTEGER NOT NULL DEFAULT 1;
 ALTER TABLE operations ADD COLUMN deleted_at TEXT;
 ALTER TABLE request_drafts ADD COLUMN stale_params_json TEXT NOT NULL DEFAULT '[]';
+"#;
+
+/// v5: cookieAuth・CSRF の自動化の設定とアプリの設定（M5）。
+///
+/// - `projects.settings_json`: プロジェクトの設定（`{"autoSession":true,"autoCsrf":true}`）。既定（`{}`）は
+///   どちらもオン。
+/// - `app_settings`: アプリ全体の設定（キー `app` に JSON。エディタのコマンドなど。設定画面は M6）。
+const V5: &str = r#"
+ALTER TABLE projects ADD COLUMN settings_json TEXT NOT NULL DEFAULT '{}';
+CREATE TABLE app_settings (
+    key   TEXT PRIMARY KEY NOT NULL,
+    value TEXT NOT NULL
+);
+"#;
+
+/// v6: 履歴・タブの復元（M6）。
+///
+/// - `history` は作り直す（v1 の列に、再送信用の元の入力・最終 URL・Operation の見出し・合計時間などを足し、
+///   一覧が軽い列だけを読めるよう、軽い列を前・重い列（ヘッダー・ボディ・元の入力）を後ろに並べる）。
+///   それまで履歴を書く処理はなかったので、消える行はない。全文検索（`history_fts`）とトリガーも作り直す。
+/// - `history_fts` は `secure-delete` を有効にする（消した行の文字を FTS の領域に残さない）。
+/// - `sessions`: プロジェクトごとの開いているタブ（JSON 1 件）。
+const V6: &str = r#"
+DROP TRIGGER IF EXISTS history_fts_insert;
+DROP TRIGGER IF EXISTS history_fts_delete;
+DROP TRIGGER IF EXISTS history_fts_update;
+DROP TABLE IF EXISTS history_fts;
+DROP TABLE IF EXISTS history;
+
+CREATE TABLE history (
+    seq                     INTEGER PRIMARY KEY AUTOINCREMENT,
+    id                      TEXT NOT NULL UNIQUE,
+    project_id              TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    sent_at                 TEXT NOT NULL,
+    environment_id          TEXT,
+    environment_name        TEXT,
+    op_key                  TEXT,
+    op_summary              TEXT,
+    method                  TEXT NOT NULL,
+    url                     TEXT NOT NULL,
+    status                  INTEGER,
+    status_text             TEXT,
+    total_ms                REAL,
+    error_kind              TEXT,
+    response_size           INTEGER NOT NULL DEFAULT 0,
+    response_binary         INTEGER NOT NULL DEFAULT 0,
+    response_body_truncated INTEGER NOT NULL DEFAULT 0,
+    error                   TEXT,
+    final_url               TEXT,
+    response_content_type   TEXT,
+    masked_fields_json      TEXT NOT NULL DEFAULT '[]',
+    override_names_json     TEXT NOT NULL DEFAULT '[]',
+    -- ここから下は重い。一覧では読まない
+    input_json              TEXT,
+    request_headers_json    TEXT NOT NULL DEFAULT '[]',
+    request_extra_json      TEXT NOT NULL DEFAULT '{}',
+    timing_json             TEXT,
+    response_headers_json   TEXT NOT NULL DEFAULT '[]',
+    request_body            TEXT,
+    response_body           TEXT
+);
+CREATE INDEX idx_history_project_sent ON history(project_id, sent_at DESC, seq DESC);
+
+CREATE VIRTUAL TABLE history_fts USING fts5(url, body, tokenize = 'trigram');
+INSERT INTO history_fts (history_fts, rank) VALUES ('secure-delete', 1);
+
+CREATE TRIGGER history_fts_insert AFTER INSERT ON history BEGIN
+    INSERT INTO history_fts (rowid, url, body)
+    VALUES (new.seq, new.url, coalesce(new.request_body, '') || char(10) || coalesce(new.response_body, ''));
+END;
+CREATE TRIGGER history_fts_delete AFTER DELETE ON history BEGIN
+    DELETE FROM history_fts WHERE rowid = old.seq;
+END;
+CREATE TRIGGER history_fts_update AFTER UPDATE OF url, request_body, response_body ON history BEGIN
+    DELETE FROM history_fts WHERE rowid = old.seq;
+    INSERT INTO history_fts (rowid, url, body)
+    VALUES (new.seq, new.url, coalesce(new.request_body, '') || char(10) || coalesce(new.response_body, ''));
+END;
+
+CREATE TABLE sessions (
+    project_id TEXT PRIMARY KEY NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    json       TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
 "#;
 
 /// 現在の `user_version` を返す。

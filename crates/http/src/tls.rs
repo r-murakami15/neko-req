@@ -9,6 +9,7 @@ use rustls::pki_types::{CertificateDer, ServerName, UnixTime};
 use rustls::{ClientConfig, DigitallySignedStruct, SignatureScheme};
 
 use crate::timing::{Recorder, TlsStartStore};
+use crate::transport::ClientIdentity;
 
 fn provider() -> Arc<CryptoProvider> {
     static PROVIDER: OnceLock<Arc<CryptoProvider>> = OnceLock::new();
@@ -30,22 +31,40 @@ fn platform_verifier() -> Result<Arc<dyn ServerCertVerifier>, String> {
 }
 
 /// reqwest に渡す rustls の設定を作る。TLS の開始時刻を `recorder` に記録する。
+///
+/// - `extra_roots`: OS の証明書ストアに足して信頼する CA（設定の「CA 証明書」）。検証を切っているときは使わない。
+/// - `identity`: クライアント証明書（サーバーが求めたときに送る）。
 pub(crate) fn client_config(
     verify_certificates: bool,
     recorder: Arc<Recorder>,
+    extra_roots: &[CertificateDer<'static>],
+    identity: Option<&ClientIdentity>,
 ) -> Result<ClientConfig, String> {
     let provider = provider();
-    let verifier: Arc<dyn ServerCertVerifier> = if verify_certificates {
+    let verifier: Arc<dyn ServerCertVerifier> = if !verify_certificates {
+        Arc::new(NoVerifier(provider.clone()))
+    } else if extra_roots.is_empty() {
         platform_verifier()?
     } else {
-        Arc::new(NoVerifier(provider.clone()))
+        Arc::new(
+            rustls_platform_verifier::Verifier::new_with_extra_roots(
+                extra_roots.iter().cloned(),
+                provider.clone(),
+            )
+            .map_err(|e| format!("CA 証明書を使えません: {e}"))?,
+        )
     };
-    let mut config = ClientConfig::builder_with_provider(provider)
+    let builder = ClientConfig::builder_with_provider(provider)
         .with_safe_default_protocol_versions()
         .map_err(|e| format!("TLS の設定に失敗しました: {e}"))?
         .dangerous()
-        .with_custom_certificate_verifier(verifier)
-        .with_no_client_auth();
+        .with_custom_certificate_verifier(verifier);
+    let mut config = match identity {
+        Some(id) => builder
+            .with_client_auth_cert(id.chain(), id.key())
+            .map_err(|e| format!("クライアント証明書を使えません: {e}"))?,
+        None => builder.with_no_client_auth(),
+    };
     config.alpn_protocols = vec![b"h2".to_vec(), b"http/1.1".to_vec()];
     config.resumption = rustls::client::Resumption::store(Arc::new(TlsStartStore { recorder }));
     Ok(config)

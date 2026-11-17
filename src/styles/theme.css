@@ -53,6 +53,15 @@
   --method-patch: #c4b5fd;
   --method-other: #a0a8b3;
 
+  /* 補助の色（ダーク） */
+  --danger-soft: #ff9b9b;
+  --danger-strong: #ff8f8f;
+  --danger-wash: rgba(58, 26, 29, 0.35);
+  --chip-accent-bg: #2a2340;
+  --chip-accent-text: #cdb5ff;
+  --timing-bar: #5c6b85;
+  --shadow-menu: 0 8px 24px rgba(0, 0, 0, 0.45);
+
   /* JSON の色 */
   --json-key: #7cc4ff;
   --json-number: #f5b95a;
@@ -79,4 +88,117 @@
   --control-h: 32px;
   --tab-h: 38px;
   --sidebar-w: 280px;
+}
+
+/*
+ * ライトテーマ。文字は背景に対して 4.5:1 以上のコントラストにしてある。
+ * 設定のテーマが「ライト」なら `<html data-theme="light">`、「OSに合わせる」なら属性なしで OS の設定（prefers-color-scheme）に従う。
+ * 同じ値を 2 か所に書く（CSS には「どちらかの条件」を 1 つの規則にまとめる書き方がないため）。
+ */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f4f5f7;
+  --bg-panel: #ffffff;
+  --bg-field: #eef0f3;
+  --bg-code: #f7f8fa;
+  --bg-active: #e9e3fb;
+  --bg-overlay: rgba(20, 22, 26, 0.45);
+  --bg-gutter: #eceef1;
+  --bg-dialog: #ffffff;
+  --bg-chip: #e6e9ee;
+  --border: #d9dde3;
+  --border-strong: #c3c9d2;
+  --text: #1d2127;
+  --text-strong: #000000;
+  --text-sub: #343a44;
+  --text-muted: #4d5560;
+  --text-subtle: #5b6470;
+  --text-faint: #5c6571;
+  --accent: #6a46de;
+  --accent-text: #ffffff;
+  --accent-soft: #4b2fb0;
+  --var: #5a3dcc;
+  --notice-bg: #efe9ff;
+  --notice-border: #cfc2f5;
+  --notice-text: #3d2a8c;
+  --success: #0c6e3e;
+  --success-bg: #dff5e8;
+  --danger: #c0262d;
+  --danger-bg: #fde8ea;
+  --warn: #8f5400;
+  --warn-bg: #fff1dc;
+  --warn-text: #744300;
+  --info: #1459b3;
+  --info-bg: #e2eefc;
+  --method-get: #0c6e3e;
+  --method-post: #8f5400;
+  --method-put: #1459b3;
+  --method-delete: #c0262d;
+  --method-patch: #5a3dcc;
+  --method-other: #4d5560;
+  --danger-soft: #b3242b;
+  --danger-strong: #a81f27;
+  --danger-wash: rgba(192, 38, 45, 0.08);
+  --chip-accent-bg: #e9e3fb;
+  --chip-accent-text: #4b2fb0;
+  --timing-bar: #8794ad;
+  --shadow-menu: 0 8px 24px rgba(20, 22, 26, 0.18);
+  --json-key: #0b5aa8;
+  --json-number: #8f5400;
+  --json-string: #1b7a1b;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    color-scheme: light;
+    --bg: #f4f5f7;
+    --bg-panel: #ffffff;
+    --bg-field: #eef0f3;
+    --bg-code: #f7f8fa;
+    --bg-active: #e9e3fb;
+    --bg-overlay: rgba(20, 22, 26, 0.45);
+    --bg-gutter: #eceef1;
+    --bg-dialog: #ffffff;
+    --bg-chip: #e6e9ee;
+    --border: #d9dde3;
+    --border-strong: #c3c9d2;
+    --text: #1d2127;
+    --text-strong: #000000;
+    --text-sub: #343a44;
+    --text-muted: #4d5560;
+    --text-subtle: #5b6470;
+    --text-faint: #5c6571;
+    --accent: #6a46de;
+    --accent-text: #ffffff;
+    --accent-soft: #4b2fb0;
+    --var: #5a3dcc;
+    --notice-bg: #efe9ff;
+    --notice-border: #cfc2f5;
+    --notice-text: #3d2a8c;
+    --success: #0c6e3e;
+    --success-bg: #dff5e8;
+    --danger: #c0262d;
+    --danger-bg: #fde8ea;
+    --warn: #8f5400;
+    --warn-bg: #fff1dc;
+    --warn-text: #744300;
+    --info: #1459b3;
+    --info-bg: #e2eefc;
+    --method-get: #0c6e3e;
+    --method-post: #8f5400;
+    --method-put: #1459b3;
+    --method-delete: #c0262d;
+    --method-patch: #5a3dcc;
+    --method-other: #4d5560;
+    --danger-soft: #b3242b;
+    --danger-strong: #a81f27;
+    --danger-wash: rgba(192, 38, 45, 0.08);
+    --chip-accent-bg: #e9e3fb;
+    --chip-accent-text: #4b2fb0;
+    --timing-bar: #8794ad;
+    --shadow-menu: 0 8px 24px rgba(20, 22, 26, 0.18);
+    --json-key: #0b5aa8;
+    --json-number: #8f5400;
+    --json-string: #1b7a1b;
+  }
 }

@@ -321,6 +321,15 @@ fn token_key(project_id: &str) -> SecretKey {
     SecretKey::new(project_id, "source", "token")
 }
 
+/// 画面から渡された確認済みのホスト（前後の空白と空を除く）。
+fn clean_hosts(hosts: &[String]) -> Vec<String> {
+    hosts
+        .iter()
+        .map(|h| h.trim().to_string())
+        .filter(|h| !h.is_empty())
+        .collect()
+}
+
 fn merge_hosts(a: &[String], b: &[String]) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
     for h in a.iter().chain(b) {
@@ -407,6 +416,7 @@ impl AppState {
                         token: None,
                         allowed_hosts: hosts.clone(),
                         root: None,
+                        transport: None,
                     },
                     Origin::Path { entry },
                 )
@@ -434,6 +444,8 @@ impl AppState {
                         token: used,
                         allowed_hosts: hosts.clone(),
                         root: None,
+                        // 設定のプロキシ・CA 証明書・クライアント証明書で取得する
+                        transport: Some(self.fetch_transport()?),
                     },
                     Origin::Url {
                         entry: url.trim().to_string(),
@@ -477,6 +489,7 @@ impl AppState {
                         allowed_hosts: hosts.clone(),
                         // 置いたコピーの外（絶対パス・../・file://）のファイルは読ませない
                         root: Some(tmp.path().to_path_buf()),
+                        transport: None,
                     },
                     Origin::Upload {
                         staged: tmp,
@@ -762,29 +775,33 @@ impl AppState {
     // ---- 同期 ----
 
     /// 同期の入力を決める（コピー方式は再アップロードが要る）。
+    ///
+    /// `confirmed_hosts` は、`needsConfirmation` で確認した別ホスト（origin）。保存済みのものと合わせて使う。
     fn sync_input(
         &self,
         project: &Project,
         upload: Option<UploadInput>,
+        confirmed_hosts: &[String],
     ) -> Result<Result<SourceInput, String>, AppError> {
         let source = project.source.as_ref().ok_or_else(|| {
             AppError::Validation("このプロジェクトには取り込み元がありません".into())
         })?;
+        let hosts = merge_hosts(&source.allowed_hosts, &clean_hosts(confirmed_hosts));
         Ok(match source.kind {
             SourceKind::Path => Ok(SourceInput::Path {
                 path: source.entry.clone(),
-                allowed_hosts: source.allowed_hosts.clone(),
+                allowed_hosts: hosts,
             }),
             SourceKind::Url => Ok(SourceInput::Url {
                 url: source.entry.clone(),
                 token: None,
-                allowed_hosts: source.allowed_hosts.clone(),
+                allowed_hosts: hosts,
             }),
             SourceKind::Copy => match upload {
                 Some(u) => Ok(SourceInput::Upload {
                     paths: u.paths,
                     entry: u.entry,
-                    allowed_hosts: source.allowed_hosts.clone(),
+                    allowed_hosts: hosts,
                 }),
                 None => Err(source.entry.clone()),
             },
@@ -792,13 +809,19 @@ impl AppState {
     }
 
     /// 同期の差分を確認する（反映はしない）。差分がなくても、更新日時・ハッシュは覚え直す。
+    ///
+    /// 別ホストの参照で `needsConfirmation` が返ったら、確認した origin（`foreign[].host`）を `allowed_hosts` に
+    /// 入れて呼び直す。読み込めたときに、確認したホストを取り込み元（`api_sources`）に保存する
+    /// （以後の同期では確認を求めない）。
     pub async fn openapi_sync_check(
         &self,
         project_id: &str,
         upload: Option<UploadInput>,
+        allowed_hosts: Option<Vec<String>>,
     ) -> Result<SyncCheckResult, AppError> {
         let project = self.project_required(project_id)?;
-        let input = match self.sync_input(&project, upload)? {
+        let confirmed = allowed_hosts.unwrap_or_default();
+        let input = match self.sync_input(&project, upload, &confirmed)? {
             Ok(i) => i,
             Err(entry) => return Ok(SyncCheckResult::NeedsUpload { entry }),
         };
@@ -812,6 +835,8 @@ impl AppState {
             }
             Err(Gate::Blocked(problems)) => return Ok(SyncCheckResult::Blocked { problems }),
         };
+        // 確認したホストは、読み込めたところで覚える
+        self.remember_hosts(&project, &ready.allowed_hosts)?;
         let diff =
             self.diff_against_stored(project_id, &ready.loaded.operations, DiffScope::Sync)?;
         let before: &[SourceFile] = project
@@ -835,13 +860,16 @@ impl AppState {
     }
 
     /// 同期を反映する。入力値（RequestDraft）は消さない。
+    /// `allowed_hosts` は `openapi_sync_check` と同じ（確認した別ホスト。反映と一緒に保存する）。
     pub async fn openapi_sync_apply(
         &self,
         project_id: &str,
         upload: Option<UploadInput>,
+        allowed_hosts: Option<Vec<String>>,
     ) -> Result<SyncApplyResult, AppError> {
         let project = self.project_required(project_id)?;
-        let input = match self.sync_input(&project, upload)? {
+        let confirmed = allowed_hosts.unwrap_or_default();
+        let input = match self.sync_input(&project, upload, &confirmed)? {
             Ok(i) => i,
             Err(entry) => return Ok(SyncApplyResult::NeedsUpload { entry }),
         };
@@ -883,6 +911,19 @@ impl AppState {
             report: report.into(),
             project: Box::new(self.project_required(project_id)?),
         })
+    }
+
+    /// 確認済みのホストに増えたものがあれば、取り込み元に保存する。
+    fn remember_hosts(&self, project: &Project, hosts: &[String]) -> Result<(), AppError> {
+        let stored: &[String] = project
+            .source
+            .as_ref()
+            .map(|s| s.allowed_hosts.as_slice())
+            .unwrap_or(&[]);
+        if hosts.len() != stored.len() || hosts.iter().zip(stored).any(|(a, b)| a != b) {
+            self.db().source_set_allowed_hosts(&project.id, hosts)?;
+        }
+        Ok(())
     }
 
     /// 更新日時の確認（パス方式）。読み直さない。パス方式以外は常に「変わっていない」。
@@ -1042,6 +1083,20 @@ impl AppState {
             self.db().source_set_has_token(project_id, true)?;
         }
         self.project_required(project_id)
+    }
+
+    /// yaml をエディタで行番号まで開く（`crate::editor`）。設定のコマンドか、自動で見つけたエディタを使う。
+    /// 見つからなければ `NoneFound`（呼び出し側が OS の既定のアプリで開く）。
+    pub fn editor_open(
+        &self,
+        project_id: &str,
+        file: &str,
+        line: Option<u32>,
+    ) -> Result<crate::editor::EditorLaunch, AppError> {
+        // 取り込み元のフォルダの外・取り込んでいないファイルは、ここで弾く
+        let path = self.editor_target(project_id, file)?;
+        let command = self.app_settings_get()?.editor_command;
+        crate::editor::launch(command.as_deref(), &path, line)
     }
 
     /// エディタで開くファイルの場所。取り込んだファイルの一覧にあるものだけ（画面から任意のパスは開けない）。

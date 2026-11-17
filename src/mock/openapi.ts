@@ -64,7 +64,7 @@ export interface MockOp {
   summary: string;
   description: string | null;
   parameters: MockParam[];
-  body?: { required: boolean; description?: string; contentType: string; schema: Schema; example?: JsonValue };
+  body?: { required: boolean; description?: string; contentType: string; schema: Schema; example?: JsonValue; examples?: { name: string; summary?: string; value: JsonValue }[] };
   responses: MockResponse[];
   /** `none` は `security: []`、`default` は全体（cookieAuth）に従う。 */
   security: "default" | "none";
@@ -272,6 +272,10 @@ function baseOps(): MockOp[] {
         required: true,
         contentType: "application/json",
         schema: ref("EmailCodeLoginRequest", obj({ email: str({ format: "email" }), code: str({ minLength: 6, maxLength: 6, description: "6 桁の認証コード" }) }, ["email", "code"])),
+        examples: [
+          { name: "正しいコード", summary: "メールで届いた 6 桁のコード", value: { email: "user@example.com", code: "123456" } },
+          { name: "期限切れのコード", summary: "LOGIN_FAILED になる", value: { email: "user@example.com", code: "000000" } },
+        ],
       },
       responses: [{ status: "204", description: "ログインした (Set-Cookie: SESSION)" }, problem("401", "コードが違う・期限切れ", [{ code: "LOGIN_FAILED", note: "" }])],
       security: "none",
@@ -553,12 +557,22 @@ export function generateExample(s: Schema, useExamples: boolean, used: { value: 
   }
 }
 
-function mediaDoc(contentType: string, schema: Schema | undefined, yamlExample: JsonValue | undefined): MediaDoc {
+function mediaDoc(
+  contentType: string,
+  schema: Schema | undefined,
+  yamlExample: JsonValue | undefined,
+  named: { name: string; summary?: string; value: JsonValue }[] = [],
+): MediaDoc {
   const generated = schema ? generateExample(schema, false) : null;
   let example: JsonValue | null = null;
   let source: MediaDoc["exampleSource"] = null;
-  if (yamlExample !== undefined) {
-    example = yamlExample;
+  // `example` があれば名前 `example` で先頭に、続いて `examples` を書かれた順に並べる（Rust 側と同じ）
+  const examples = [
+    ...(yamlExample !== undefined ? [{ name: "example", summary: null, description: null, value: yamlExample }] : []),
+    ...named.map((n) => ({ name: n.name, summary: n.summary ?? null, description: null, value: n.value })),
+  ];
+  if (examples.length > 0) {
+    example = examples[0].value;
     source = "yaml";
   } else if (schema) {
     const used = { value: false };
@@ -571,6 +585,7 @@ function mediaDoc(contentType: string, schema: Schema | undefined, yamlExample: 
     rows: schemaRows(schema),
     example,
     exampleSource: source,
+    examples,
     generatedExample: generated,
   };
 }
@@ -618,7 +633,7 @@ export function mockOperationDetail(op: MockOp, importedAt: string | null, delet
     importedAt,
     parameters: op.parameters.map(paramDoc),
     requestBody: op.body
-      ? { required: op.body.required, description: op.body.description ?? null, contents: [mediaDoc(op.body.contentType, op.body.schema, op.body.example)] }
+      ? { required: op.body.required, description: op.body.description ?? null, contents: [mediaDoc(op.body.contentType, op.body.schema, op.body.example, op.body.examples)] }
       : null,
     responses,
     errorCodes: responses.flatMap((r) => r.errorCodes),

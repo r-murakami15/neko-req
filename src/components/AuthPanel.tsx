@@ -1,4 +1,6 @@
-import type { ApiKeyIn, AuthOverride, AutoHeader, DefaultAuth, RequestSpec } from "../bindings";
+import { errorMessage } from "../api";
+import { DEFAULT_PROJECT_SETTINGS, useSaveProjectSettings } from "../api/queries";
+import type { ApiKeyIn, AuthOverride, AutoHeader, DefaultAuth, Project, RequestSpec } from "../bindings";
 import type { UnresolvedIndex } from "../lib/vars";
 import type { RequestTab } from "../store/tabs";
 import { InfoIcon, LockIcon } from "./Icons";
@@ -34,11 +36,53 @@ const API_KEY_IN: { value: ApiKeyIn; label: string }[] = [
 ];
 
 interface Props {
+  project: Project;
   tab: RequestTab;
   onSpec: (update: (spec: RequestSpec) => RequestSpec) => void;
   onKind: (kind: AuthKind) => void;
   unresolved: UnresolvedIndex;
   autoHeaders: AutoHeader[];
+  /** 自動で付かない理由（トークンがまだない・送り先が baseUrl と違うなど）。 */
+  autoNotes: string[];
+}
+
+/** 認証の自動化の 2 つのチェック（プロジェクトの設定）。 */
+function AutoAuthSettings({ project }: { project: Project }) {
+  const settings = project.settings ?? DEFAULT_PROJECT_SETTINGS;
+  const save = useSaveProjectSettings(project.id);
+  return (
+    <div className="auto-auth" role="group" aria-label="認証の自動化">
+      <label className="auto-auth-item">
+        <input
+          type="checkbox"
+          checked={settings.autoSession}
+          disabled={save.isPending}
+          onChange={(e) => save.mutate({ ...settings, autoSession: e.target.checked })}
+        />
+        <span className="auto-auth-text">
+          <span>ログインの API の Set-Cookie から SESSION を自動で更新</span>
+          <span className="auto-auth-sub">レスポンスの SESSION を、選んでいる環境の変数 session に保存し、次のリクエストの Cookie に付ける</span>
+        </span>
+      </label>
+      <label className="auto-auth-item">
+        <input
+          type="checkbox"
+          checked={settings.autoCsrf}
+          disabled={save.isPending}
+          onChange={(e) => save.mutate({ ...settings, autoCsrf: e.target.checked })}
+        />
+        <span className="auto-auth-text">
+          <span>GET 以外では CSRF トークンを自動で付ける</span>
+          <span className="auto-auth-sub">XSRF-TOKEN Cookie の値を X-XSRF-TOKEN ヘッダーに入れる</span>
+        </span>
+      </label>
+      {save.isError && (
+        <p className="form-error" role="alert">
+          保存できませんでした: {errorMessage(save.error)}
+        </p>
+      )}
+    </div>
+  );
 }
 
 const API_KEY_IN_LABEL: Record<ApiKeyIn, string> = { header: "ヘッダー", query: "クエリ", cookie: "Cookie" };
@@ -104,13 +148,14 @@ function DefaultAuthView({ auth }: { auth: DefaultAuth | null }) {
 }
 
 /** 認証のタブ（プロジェクトの既定・なし・API キー・Bearer・Basic）。 */
-export function AuthPanel({ tab, onSpec, onKind, unresolved, autoHeaders }: Props) {
+export function AuthPanel({ project, tab, onSpec, onKind, unresolved, autoHeaders, autoNotes }: Props) {
   const op = tab.op;
   // yaml の API では、`auth` が空（null）なら「プロジェクトの既定を使う」。そうでないタブでは、空は「なし」
   const kind: AuthKind = op && tab.spec.auth === null ? "default" : (tab.spec.auth?.type ?? "none");
   const auth = tab.spec.auth ?? { type: "none" as const };
   const setAuth = (next: AuthOverride) => onSpec((s) => ({ ...s, auth: next }));
-  const sent = autoHeaders.filter((h) => h.source.includes("認証"));
+  // 認証のために付くヘッダー（認証タブの方式・cookieAuth の Cookie・CSRF の X-XSRF-TOKEN）
+  const sent = autoHeaders.filter((h) => /^(authorization|cookie|x-xsrf-token)$/i.test(h.name) || h.source.startsWith("認証") || h.source.includes("CSRF"));
 
   return (
     <div className="auth-layout">
@@ -180,24 +225,35 @@ export function AuthPanel({ tab, onSpec, onKind, unresolved, autoHeaders }: Prop
           </div>
         )}
 
-        {(kind === "default" ? op?.defaultAuth != null : kind !== "none") && (
-          <div className="field-label">
-            送信されるヘッダー
-            <div className="code-box">
-              {sent.length === 0 ? (
-                <span className="muted-note">
-                  {kind === "default" ? "変数が展開できないので、認証なしで送ります" : "ヘッダーには付きません（クエリ・Cookie、または値が空です）"}
-                </span>
-              ) : (
-                sent.map((h, i) => (
-                  <div key={`${h.name}-${i}`}>
-                    {h.name}: {h.value}
-                  </div>
-                ))
-              )}
-            </div>
+        <AutoAuthSettings project={project} />
+
+        <div className="field-label">
+          送信されるヘッダー
+          <div className="code-box" aria-label="送信されるヘッダー">
+            {sent.length === 0 ? (
+              <span className="muted-note">
+                {kind === "default" && op?.defaultAuth != null
+                  ? "変数が展開できないので、認証なしで送ります"
+                  : kind === "none" || (kind === "default" && op?.defaultAuth == null)
+                    ? "認証のヘッダーは付きません"
+                    : "ヘッダーには付きません（クエリ、または値が空です）"}
+              </span>
+            ) : (
+              sent.map((h, i) => (
+                <div key={`${h.name}-${i}`}>
+                  {h.name}: {h.value}
+                </div>
+              ))
+            )}
           </div>
-        )}
+          {autoNotes.length > 0 && (
+            <ul className="auto-notes" aria-label="自動で付かないもの">
+              {autoNotes.map((n) => (
+                <li key={n}>{n}</li>
+              ))}
+            </ul>
+          )}
+        </div>
 
         <div className="lock-note">
           <LockIcon />

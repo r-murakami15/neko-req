@@ -279,7 +279,17 @@ async fn import_list_open_and_send_through_app_state() {
         .unwrap();
     assert!(!cookie.value.contains("s3cret-session"), "{cookie:?}");
 
-    // security: [] の API には付かない
+    // security: [] の API には、既定の認証としては付かない（M5 の自動化はオフにして、M3 の動きを確かめる。
+    // 自動化がオンのときは、ログインの 2 段階目のために SESSION を付ける: tests/m5_cookie_csrf.rs）
+    f.state
+        .project_settings_set(
+            &project.id,
+            &nekoreq_core::ProjectSettings {
+                auto_session: false,
+                auto_csrf: false,
+            },
+        )
+        .unwrap();
     let health_open = f
         .state
         .operation_open(&project.id, &OpKey::method_path("GET", "/health"))
@@ -478,7 +488,7 @@ async fn sync_shows_changes_keeps_drafts_and_moves_removed_apis() {
     let SyncCheckResult::Ready {
         diff,
         changed_files,
-    } = f.state.openapi_sync_check(&pid, None).await.unwrap()
+    } = f.state.openapi_sync_check(&pid, None, None).await.unwrap()
     else {
         panic!()
     };
@@ -507,7 +517,7 @@ async fn sync_shows_changes_keeps_drafts_and_moves_removed_apis() {
     let SyncCheckResult::Ready {
         diff,
         changed_files,
-    } = f.state.openapi_sync_check(&pid, None).await.unwrap()
+    } = f.state.openapi_sync_check(&pid, None, None).await.unwrap()
     else {
         panic!()
     };
@@ -540,7 +550,7 @@ async fn sync_shows_changes_keeps_drafts_and_moves_removed_apis() {
         diff: applied,
         report,
         project,
-    } = f.state.openapi_sync_apply(&pid, None).await.unwrap()
+    } = f.state.openapi_sync_apply(&pid, None, None).await.unwrap()
     else {
         panic!()
     };
@@ -593,7 +603,8 @@ async fn sync_shows_changes_keeps_drafts_and_moves_removed_apis() {
     assert_eq!(f.state.operation_list(&pid).unwrap().len(), 5);
     assert!(f.state.draft_get(&pid, &key("getTree")).unwrap().is_none());
     // もう一度確認すると変更なし
-    let SyncCheckResult::Ready { diff, .. } = f.state.openapi_sync_check(&pid, None).await.unwrap()
+    let SyncCheckResult::Ready { diff, .. } =
+        f.state.openapi_sync_check(&pid, None, None).await.unwrap()
     else {
         panic!()
     };
@@ -614,7 +625,7 @@ async fn broken_yaml_aborts_the_sync_and_keeps_the_previous_operations() {
     )
     .unwrap();
     let SyncCheckResult::Blocked { problems } =
-        f.state.openapi_sync_check(&pid, None).await.unwrap()
+        f.state.openapi_sync_check(&pid, None, None).await.unwrap()
     else {
         panic!("止まるはず")
     };
@@ -626,7 +637,8 @@ async fn broken_yaml_aborts_the_sync_and_keeps_the_previous_operations() {
     };
     assert_eq!(file, "paths/tree.yaml");
     assert!(line.is_some() && !reason.is_empty());
-    let SyncApplyResult::Blocked { .. } = f.state.openapi_sync_apply(&pid, None).await.unwrap()
+    let SyncApplyResult::Blocked { .. } =
+        f.state.openapi_sync_apply(&pid, None, None).await.unwrap()
     else {
         panic!()
     };
@@ -639,7 +651,7 @@ async fn broken_yaml_aborts_the_sync_and_keeps_the_previous_operations() {
     std::fs::remove_file(tmp.path().join("common/responses.yaml")).unwrap();
     std::fs::write(tmp.path().join("paths/tree.yaml"), "paths: {}\n").unwrap();
     let SyncCheckResult::Blocked { problems } =
-        f.state.openapi_sync_check(&pid, None).await.unwrap()
+        f.state.openapi_sync_check(&pid, None, None).await.unwrap()
     else {
         panic!()
     };
@@ -667,8 +679,11 @@ async fn integrating_into_an_existing_project_shows_a_diff_and_adds_unselected_l
     };
     assert_eq!(f.state.operation_list(&project.id).unwrap().len(), 1);
     // 選ばなかった API は同期で「追加」と出ない
-    let SyncCheckResult::Ready { diff, .. } =
-        f.state.openapi_sync_check(&project.id, None).await.unwrap()
+    let SyncCheckResult::Ready { diff, .. } = f
+        .state
+        .openapi_sync_check(&project.id, None, None)
+        .await
+        .unwrap()
     else {
         panic!()
     };
@@ -744,8 +759,11 @@ async fn upload_copies_the_folder_and_sync_needs_a_new_upload() {
     assert!(!f.state.openapi_source_changed(&project.id).unwrap().changed);
 
     // 同期はもう一度アップロード
-    let SyncCheckResult::NeedsUpload { entry } =
-        f.state.openapi_sync_check(&project.id, None).await.unwrap()
+    let SyncCheckResult::NeedsUpload { entry } = f
+        .state
+        .openapi_sync_check(&project.id, None, None)
+        .await
+        .unwrap()
     else {
         panic!()
     };
@@ -756,7 +774,7 @@ async fn upload_copies_the_folder_and_sync_needs_a_new_upload() {
     };
     let SyncCheckResult::Ready { diff, .. } = f
         .state
-        .openapi_sync_check(&project.id, Some(up.clone()))
+        .openapi_sync_check(&project.id, Some(up.clone()), None)
         .await
         .unwrap()
     else {
@@ -765,7 +783,7 @@ async fn upload_copies_the_folder_and_sync_needs_a_new_upload() {
     assert_eq!(diff.removed.len(), 1);
     let SyncApplyResult::Applied { .. } = f
         .state
-        .openapi_sync_apply(&project.id, Some(up))
+        .openapi_sync_apply(&project.id, Some(up), None)
         .await
         .unwrap()
     else {
@@ -953,8 +971,11 @@ async fn url_source_stores_the_token_in_the_keychain_and_uses_it_for_sync() {
         );
     }
     // 同期はキーチェーンのトークンで読める
-    let SyncCheckResult::Ready { diff, .. } =
-        f.state.openapi_sync_check(&project.id, None).await.unwrap()
+    let SyncCheckResult::Ready { diff, .. } = f
+        .state
+        .openapi_sync_check(&project.id, None, None)
+        .await
+        .unwrap()
     else {
         panic!()
     };
@@ -969,8 +990,11 @@ async fn url_source_stores_the_token_in_the_keychain_and_uses_it_for_sync() {
         .get(&SecretKey::new(&project.id, "source", "token"))
         .unwrap()
         .is_none());
-    let SyncCheckResult::Blocked { .. } =
-        f.state.openapi_sync_check(&project.id, None).await.unwrap()
+    let SyncCheckResult::Blocked { .. } = f
+        .state
+        .openapi_sync_check(&project.id, None, None)
+        .await
+        .unwrap()
     else {
         panic!("トークンを消したので読めない")
     };
@@ -1040,8 +1064,11 @@ async fn foreign_host_reference_waits_for_confirmation_in_the_app_and_is_remembe
     .await;
     assert_eq!(project.source.as_ref().unwrap().allowed_hosts, vec![host]);
     // 同期では確認済みのホストをそのまま読む
-    let SyncCheckResult::Ready { diff, .. } =
-        f.state.openapi_sync_check(&project.id, None).await.unwrap()
+    let SyncCheckResult::Ready { diff, .. } = f
+        .state
+        .openapi_sync_check(&project.id, None, None)
+        .await
+        .unwrap()
     else {
         panic!("確認済みなので聞き直さない")
     };
@@ -1205,8 +1232,11 @@ async fn real_fixture_description_change_is_a_diff_and_drafts_survive() {
     .unwrap();
     assert!(f.state.openapi_source_changed(&project.id).unwrap().changed);
     let t = Instant::now();
-    let SyncCheckResult::Ready { diff, .. } =
-        f.state.openapi_sync_check(&project.id, None).await.unwrap()
+    let SyncCheckResult::Ready { diff, .. } = f
+        .state
+        .openapi_sync_check(&project.id, None, None)
+        .await
+        .unwrap()
     else {
         panic!()
     };
@@ -1216,7 +1246,10 @@ async fn real_fixture_description_change_is_a_diff_and_drafts_survive() {
     assert_eq!(diff.changed.len(), 1);
     assert_eq!(diff.changed[0].entry.op_key, get);
     assert_eq!(diff.changed[0].changes[0].field, ChangedField::Description);
-    f.state.openapi_sync_apply(&project.id, None).await.unwrap();
+    f.state
+        .openapi_sync_apply(&project.id, None, None)
+        .await
+        .unwrap();
     let detail = f.state.operation_get(&project.id, &get).unwrap();
     assert!(detail.description.unwrap().starts_with("【書き換え】"));
     let open = f.state.operation_open(&project.id, &get).unwrap();

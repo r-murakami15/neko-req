@@ -21,13 +21,13 @@ if (typeof HTMLElement !== "undefined") {
   Object.defineProperty(HTMLElement.prototype, "clientHeight", {
     configurable: true,
     get(this: HTMLElement) {
-      return this.classList?.contains("tree-scroll") ? 560 : 0;
+      return this.classList?.contains("tree-scroll") || this.classList?.contains("history-scroll") ? 560 : 0;
     },
   });
   Object.defineProperty(HTMLElement.prototype, "clientWidth", {
     configurable: true,
     get(this: HTMLElement) {
-      return this.classList?.contains("tree-scroll") ? 280 : 0;
+      return this.classList?.contains("tree-scroll") || this.classList?.contains("history-scroll") ? 280 : 0;
     },
   });
 }
