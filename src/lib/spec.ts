@@ -1,4 +1,4 @@
-import type { AdHocRequest, Body, KeyValue, ParamIn, RequestSpec, SendSettings } from "../bindings";
+import type { AdHocRequest, Body, KeyValue, ParamDoc, ParamIn, ParamRef, RequestSpec, SendSettings } from "../bindings";
 
 export const METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"] as const;
 
@@ -60,4 +60,51 @@ const METHOD_COLORS: Record<string, string> = {
 /** メソッドの色（HEAD・OPTIONS は控えめな色）。 */
 export function methodColor(method: string): string {
   return METHOD_COLORS[method.toUpperCase()] ?? "var(--method-other)";
+}
+
+/** パラメータ・ヘッダーの表に出す、yaml 側の情報（表示専用）。 */
+export interface ParamMeta {
+  docs: ParamDoc[];
+  /** yaml から消えたパラメータ。 */
+  missing: ParamRef[];
+  /** yaml の必須パラメータ。 */
+  required: ParamRef[];
+}
+
+/** 表の 1 行に付く、yaml 側の情報。 */
+export interface RowInfo {
+  description: string | null;
+  /** yaml では必須。 */
+  required: boolean;
+  /** 必須なのに、無効または空（警告。送信はできる）。 */
+  emptyRequired: boolean;
+  /** yaml にない（入力値は残してあるが、送信から外す）。 */
+  missing: boolean;
+}
+
+const sameRef = (r: ParamRef, item: Pick<KeyValue, "location" | "name">) => r.location === item.location && r.name === item.name;
+
+export function rowInfoFor(meta: ParamMeta, item: KeyValue): RowInfo {
+  const required = meta.required.some((r) => sameRef(r, item));
+  return {
+    description: meta.docs.find((d) => d.location === item.location && d.name === item.name)?.description ?? null,
+    required,
+    emptyRequired: required && (!item.enabled || item.value.trim() === ""),
+    missing: meta.missing.some((r) => sameRef(r, item)),
+  };
+}
+
+/** 送る内容。yaml にないパラメータは、有効にしてあっても送らない（行は残すので、行番号は変わらない）。 */
+export function specForSend(spec: RequestSpec, missing: ParamRef[]): RequestSpec {
+  if (missing.length === 0 || !spec.params.some((p) => p.enabled && missing.some((m) => sameRef(m, p)))) return spec;
+  return { ...spec, params: spec.params.map((p) => (missing.some((m) => sameRef(m, p)) ? { ...p, enabled: false } : p)) };
+}
+
+/** yaml の必須パラメータで、行がない・無効・空のもの（path は URL の警告で出るので除く）。 */
+export function emptyRequiredParams(spec: RequestSpec, required: ParamRef[]): ParamRef[] {
+  return required.filter((r) => {
+    if (r.location === "path") return false;
+    const row = spec.params.find((p) => sameRef(r, p));
+    return !row || !row.enabled || row.value.trim() === "";
+  });
 }

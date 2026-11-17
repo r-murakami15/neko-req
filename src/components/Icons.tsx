@@ -145,3 +145,28 @@ export const TrashIcon = () => (
     <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />
   </Svg>
 );
+
+export const SyncIcon = () => (
+  <Svg>
+    <path d="M20 11a8 8 0 0 0-14.3-4.6L4 8" />
+    <path d="M4 4v4h4" />
+    <path d="M4 13a8 8 0 0 0 14.3 4.6L20 16" />
+    <path d="M20 20v-4h-4" />
+  </Svg>
+);
+
+export const FileIcon = () => (
+  <Svg>
+    <path d="M6 3h8l4 4v14H6z" />
+    <path d="M14 3v4h4" />
+    <path d="M9 13h6M9 17h6" />
+  </Svg>
+);
+
+export const UploadIcon = () => (
+  <Svg>
+    <path d="M12 16V4" />
+    <path d="M7 9l5-5 5 5" />
+    <path d="M5 20h14" />
+  </Svg>
+);

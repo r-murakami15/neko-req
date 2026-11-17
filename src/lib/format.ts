@@ -17,3 +17,11 @@ export function formatMs(ms: number): string {
   if (ms < 1000) return `${Math.round(ms)} ms`;
   return `${(ms / 1000).toFixed(2)} s`;
 }
+
+/** RFC 3339 の日時を、端末の時刻で `2026/11/16 14:24` の形にする。読めなければそのまま返す。 */
+export function formatDateTime(rfc3339: string): string {
+  const d = new Date(rfc3339);
+  if (Number.isNaN(d.getTime())) return rfc3339;
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}/${p(d.getMonth() + 1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}

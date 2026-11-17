@@ -17,6 +17,7 @@ pub async fn load_path(p: &Path) -> LoadResult {
         entry: LoadEntry::Path(p.to_path_buf()),
         token: None,
         allowed_hosts: vec![],
+        root: None,
     })
     .await
 }

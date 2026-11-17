@@ -39,6 +39,12 @@ interface UiState {
   /** 「新規作成」のダイアログ。 */
   newRequestDialogOpen: boolean;
   setNewRequestDialogOpen: (open: boolean) => void;
+  /** 「OpenAPI 取り込み」のダイアログ。 */
+  importDialogOpen: boolean;
+  setImportDialogOpen: (open: boolean) => void;
+  /** 同期の確認ダイアログ。 */
+  syncDialogOpen: boolean;
+  setSyncDialogOpen: (open: boolean) => void;
 }
 
 export const useUiStore = create<UiState>()(
@@ -52,6 +58,10 @@ export const useUiStore = create<UiState>()(
       setScreen: (screen) => set({ screen }),
       newRequestDialogOpen: false,
       setNewRequestDialogOpen: (open) => set({ newRequestDialogOpen: open }),
+      importDialogOpen: false,
+      setImportDialogOpen: (open) => set({ importDialogOpen: open }),
+      syncDialogOpen: false,
+      setSyncDialogOpen: (open) => set({ syncDialogOpen: open }),
     }),
     {
       name: "nekoreq-ui",

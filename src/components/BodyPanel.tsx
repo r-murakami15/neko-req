@@ -6,6 +6,7 @@ import { checkJson, formatJson } from "../lib/json";
 import type { UnresolvedIndex } from "../lib/vars";
 import type { RequestTab } from "../store/tabs";
 import { CloseIcon } from "./Icons";
+import { ConfirmDialog } from "./Dialog";
 import { JsonEditor } from "./JsonEditor";
 import { KeyValueTable } from "./KeyValueTable";
 import { VarInput } from "./VarInput";
@@ -50,10 +51,12 @@ interface Props {
   onSpec: (update: (spec: RequestSpec) => RequestSpec) => void;
   onKind: (kind: Body["kind"]) => void;
   unresolved: UnresolvedIndex;
+  /** yaml の API のとき: スキーマだけから生成した JSON の例（整形済みの文字列）。「スキーマから例を生成」で入れる。 */
+  schemaExample?: string | null;
 }
 
 /** ボディのタブ。 */
-export function BodyPanel({ tab, onSpec, onKind, unresolved }: Props) {
+export function BodyPanel({ tab, onSpec, onKind, unresolved, schemaExample = null }: Props) {
   const body = tab.spec.body;
   const setBody = (next: Body) => onSpec((s) => ({ ...s, body: next }));
   const contentType = CONTENT_TYPE[body.kind];
@@ -77,7 +80,9 @@ export function BodyPanel({ tab, onSpec, onKind, unresolved }: Props) {
 
       {body.kind === "none" && <p className="muted-note">このリクエストにはボディがありません。</p>}
 
-      {body.kind === "json" && <JsonBody value={body.value} onChange={(v) => setBody({ kind: "json", value: v })} unresolved={unresolved.body} />}
+      {body.kind === "json" && (
+        <JsonBody value={body.value} onChange={(v) => setBody({ kind: "json", value: v })} unresolved={unresolved.body} schemaExample={schemaExample} />
+      )}
 
       {body.kind === "form" && (
         <>
@@ -129,8 +134,19 @@ export function BodyPanel({ tab, onSpec, onKind, unresolved }: Props) {
   );
 }
 
-function JsonBody({ value, onChange, unresolved }: { value: string; onChange: (v: string) => void; unresolved: ReadonlySet<string> }) {
+function JsonBody({
+  value,
+  onChange,
+  unresolved,
+  schemaExample,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  unresolved: ReadonlySet<string>;
+  schemaExample: string | null;
+}) {
   const [formatError, setFormatError] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
   const check = checkJson(value);
 
   const format = () => {
@@ -147,10 +163,33 @@ function JsonBody({ value, onChange, unresolved }: { value: string; onChange: (v
     <>
       <div className="body-toolbar">
         <span className="muted-note">Content-Type: application/json</span>
-        <button type="button" className="btn btn-small btn-ghost" onClick={format}>
+        {schemaExample !== null && (
+          <button
+            type="button"
+            className="btn btn-small btn-ghost body-toolbar-right"
+            title="yaml のスキーマの型だけから作った例で、ボディを置き換えます"
+            onClick={() => (value.trim() === "" ? onChange(schemaExample) : setConfirming(true))}
+          >
+            スキーマから例を生成
+          </button>
+        )}
+        <button type="button" className={`btn btn-small btn-ghost${schemaExample === null ? " body-toolbar-right" : ""}`} onClick={format}>
           整形
         </button>
       </div>
+      <ConfirmDialog
+        open={confirming}
+        onOpenChange={setConfirming}
+        title="ボディを置き換えますか？"
+        description="今のボディを、スキーマから作った例で置き換えます。この操作は取り消せません。"
+        confirmLabel="置き換える"
+        danger
+        onConfirm={() => {
+          setConfirming(false);
+          setFormatError(null);
+          if (schemaExample !== null) onChange(schemaExample);
+        }}
+      />
       <JsonEditor
         value={value}
         onChange={(v) => {

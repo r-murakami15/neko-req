@@ -3,8 +3,12 @@
 //! - ファイルは絶対パス（URL）で 1 回だけ読む。相対パスは `$ref` を書いたファイルが基準。
 //! - 足りない・読めないファイルは、足りないファイル名と参照元の `file:line` の一覧にして止める。
 //! - 壊れた yaml は、ファイル・行・理由を返して止める。
-//! - URL の入口で別のホストを指す参照は、読む前に確認を求める（読まずに `NeedsConfirmation` で返す）。
+//! - URL の入口で別の origin（スキーム・ホスト・ポート）を指す参照は、読む前に確認を求める（読まずに
+//!   `NeedsConfirmation` で返す）。確認済みの origin は `allowed_hosts` に `https://host[:port]` の形で持つ。
 //!   アクセストークンは入口と同じ origin にだけ送る。
+//! - 入口の URL がリダイレクトされたら、相対 `$ref` はリダイレクト後の URL を基準に解決する。リダイレクト先の
+//!   origin の参照は、確認なしで読む（トークンは送らない）。
+//! - `root` があるときは（アップロードのコピー方式）、その外のファイルは読まない（足りないファイル扱い）。
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::{Path, PathBuf};
@@ -27,13 +31,27 @@ pub enum LoadEntry {
     Url(String),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct LoadParams {
     pub entry: LoadEntry,
     /// URL 方式のアクセストークン（入口と同じ origin にだけ送る）。
     pub token: Option<String>,
-    /// 確認済みの別ホスト（`host` または `host:port`）。
+    /// 確認済みの別の origin（`https://host` `http://host:8080` の形。`ForeignRef.host` と同じ）。
     pub allowed_hosts: Vec<String>,
+    /// 基準フォルダ。あれば、解決した `$ref` がこの外のファイルなら読まない（アップロードのコピー方式。
+    /// 一時フォルダ・`sources/<ID>`）。`None`（パス方式）は制限なし。
+    pub root: Option<PathBuf>,
+}
+
+impl std::fmt::Debug for LoadParams {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LoadParams")
+            .field("entry", &self.entry)
+            .field("token", &self.token.as_ref().map(|_| "***"))
+            .field("allowed_hosts", &self.allowed_hosts)
+            .field("root", &self.root)
+            .finish()
+    }
 }
 
 pub enum Crawl {
@@ -124,13 +142,27 @@ fn scan(v: &Value, ptr: &mut String, in_name_map: bool, out: &mut Vec<(String, S
     }
 }
 
-/// `host` または `host:port`（小文字）。
-pub fn host_key(u: &Url) -> String {
+/// origin の表記（`https://host` `http://host:8080`。スキーム・ホスト・ポートで 1 つ。小文字）。
+/// 既定のポート（http 80・https 443）は省く。
+pub fn origin_key(u: &Url) -> String {
     let host = u.host_str().unwrap_or("").to_ascii_lowercase();
     match u.port() {
-        Some(p) => format!("{host}:{p}"),
-        None => host,
+        Some(p) => format!("{}://{host}:{p}", u.scheme()),
+        None => format!("{}://{host}", u.scheme()),
     }
+}
+
+/// 確認済みの一覧に `u` の origin があるか。スキームのない古い表記（`host` `host:port`）は https だけに効く。
+fn origin_allowed(allowed: &[String], u: &Url) -> bool {
+    let key = origin_key(u);
+    allowed.iter().any(|h| {
+        let h = h.trim();
+        if h.contains("://") {
+            h.eq_ignore_ascii_case(&key)
+        } else {
+            u.scheme() == "https" && format!("https://{h}").eq_ignore_ascii_case(&key)
+        }
+    })
 }
 
 fn same_origin(a: &Url, b: &Url) -> bool {
@@ -194,6 +226,10 @@ fn value_text(v: &Value) -> String {
 struct Crawler<'a> {
     params: &'a LoadParams,
     entry: Loc,
+    /// 入口を URL で読んだときの、リダイレクトのあとの URL。
+    entry_final: Option<Url>,
+    /// 解決したパスの基準フォルダ（`LoadParams::root` を正規化したもの）。
+    root: Option<PathBuf>,
     docs: DocSet,
     queue: VecDeque<Loc>,
     queued: HashSet<String>,
@@ -220,7 +256,7 @@ impl Crawler<'_> {
         }
     }
 
-    async fn read(&self, loc: &Loc) -> Result<(Vec<u8>, Option<String>), String> {
+    async fn read(&self, loc: &Loc) -> Result<(Vec<u8>, Option<String>, Option<Url>), String> {
         match loc {
             Loc::File(p) => {
                 let bytes = std::fs::read(p).map_err(|e| match e.kind() {
@@ -230,10 +266,10 @@ impl Crawler<'_> {
                 if bytes.len() > MAX_FILE_BYTES {
                     return Err("ファイルが大きすぎます".into());
                 }
-                Ok((bytes, modified_string(p)))
+                Ok((bytes, modified_string(p), None))
             }
             Loc::Url(u) => {
-                let bytes = nekoreq_http::fetch_bytes(
+                let (bytes, final_url) = nekoreq_http::fetch_bytes_at(
                     u,
                     self.token_for(loc),
                     FETCH_TIMEOUT,
@@ -241,8 +277,25 @@ impl Crawler<'_> {
                 )
                 .await
                 .map_err(|e| e.message)?;
-                Ok((bytes, None))
+                Ok((bytes, None, Some(final_url)))
             }
+        }
+    }
+
+    fn inside_root(&self, p: &Path) -> bool {
+        match &self.root {
+            Some(root) => p.starts_with(root),
+            None => true,
+        }
+    }
+
+    /// 入口と同じ origin か（入口のリダイレクト先を含む）。
+    fn is_entry_origin(&self, u: &Url) -> bool {
+        match &self.entry {
+            Loc::Url(e) => {
+                same_origin(u, e) || self.entry_final.as_ref().is_some_and(|f| same_origin(u, f))
+            }
+            Loc::File(_) => false,
         }
     }
 
@@ -256,7 +309,7 @@ impl Crawler<'_> {
     /// `loc` を読んで文書に加え、中の `$ref` から次に読むファイルを集める。
     async fn load_one(&mut self, loc: Loc, is_entry: bool) {
         let display = self.display(&loc);
-        let (bytes, modified_at) = match self.read(&loc).await {
+        let (bytes, modified_at, final_url) = match self.read(&loc).await {
             Ok(x) => x,
             Err(reason) => {
                 let problem = if is_entry {
@@ -314,7 +367,14 @@ impl Crawler<'_> {
             modified_at,
             hash: sha_hex(text.as_bytes()),
             bytes: text.len(),
+            base_url: final_url.clone(),
         };
+        if is_entry {
+            self.entry_final = final_url.map(|mut u| {
+                u.set_fragment(None);
+                u
+            });
+        }
         let idx = self.docs.push(doc);
         for (node_ptr, reference) in refs {
             let (file_part, _) = split_ref(&reference);
@@ -329,12 +389,20 @@ impl Crawler<'_> {
                 file: display.clone(),
                 line,
             };
-            match loc.join(file_part) {
+            match self.docs.files[idx].join(file_part) {
                 Err(reason) => self.problems.push(LoadProblem::MissingFile {
                     file: file_part.to_string(),
                     reason,
                     referenced_from: vec![site],
                 }),
+                Ok(Loc::File(p)) if !self.inside_root(&p) => {
+                    // 基準フォルダの外は読まない。表示は `$ref` に書かれた文字列（実際のパスは出さない）
+                    self.problems.push(LoadProblem::MissingFile {
+                        file: file_part.to_string(),
+                        reason: "取り込んだフォルダの外のファイルは読めません".into(),
+                        referenced_from: vec![site],
+                    });
+                }
                 Ok(target) => self.enqueue(target, site),
             }
         }
@@ -343,18 +411,11 @@ impl Crawler<'_> {
     fn enqueue(&mut self, target: Loc, site: RefSite) {
         let key = target.key();
         if let Loc::Url(u) = &target {
-            let allowed = match &self.entry {
-                Loc::Url(e) if same_origin(u, e) => true,
-                _ => self
-                    .params
-                    .allowed_hosts
-                    .iter()
-                    .any(|h| h.eq_ignore_ascii_case(&host_key(u))),
-            };
+            let allowed = self.is_entry_origin(u) || origin_allowed(&self.params.allowed_hosts, u);
             if !allowed {
                 if self.foreign_seen.insert(key) {
                     self.foreign.push(ForeignRef {
-                        host: host_key(u),
+                        host: origin_key(u),
                         url: strip_secrets(u),
                         referenced_from: site,
                     });
@@ -377,18 +438,39 @@ impl Crawler<'_> {
     }
 }
 
+/// URL の入口にユーザー名・パスワード（`user:pass@`）があったときの案内。
+pub const USERINFO_MESSAGE: &str =
+    "URL にユーザー名・パスワード（user:pass@）は入れられません。アクセストークンはトークン欄に入力してください";
+
+/// 入口の URL に `user:pass@` があればエラーの文（取り込み・同期の入口で先に弾く）。
+pub fn check_entry_url(s: &str) -> Result<(), String> {
+    match Url::parse(s.trim()) {
+        Ok(u) if !u.username().is_empty() || u.password().is_some() => {
+            Err(USERINFO_MESSAGE.to_string())
+        }
+        _ => Ok(()),
+    }
+}
+
+fn absolute(p: &Path) -> PathBuf {
+    if p.is_absolute() {
+        p.to_path_buf()
+    } else {
+        std::env::current_dir().unwrap_or_default().join(p)
+    }
+}
+
 /// 入口から参照先まですべて読む。
 pub async fn crawl(params: &LoadParams) -> Crawl {
     let entry = match &params.entry {
-        LoadEntry::Path(p) => {
-            let abs = if p.is_absolute() {
-                p.clone()
-            } else {
-                std::env::current_dir().unwrap_or_default().join(p)
-            };
-            Loc::File(crate::doc::normalize_path(&abs))
-        }
+        LoadEntry::Path(p) => Loc::File(crate::doc::normalize_path(&absolute(p))),
         LoadEntry::Url(s) => match Url::parse(s) {
+            Ok(u) if !u.username().is_empty() || u.password().is_some() => {
+                return Crawl::Blocked(vec![LoadProblem::Unreadable {
+                    file: strip_secrets(&u),
+                    reason: USERINFO_MESSAGE.into(),
+                }])
+            }
             Ok(mut u) if u.scheme() == "http" || u.scheme() == "https" => {
                 u.set_fragment(None);
                 Loc::Url(u)
@@ -404,6 +486,11 @@ pub async fn crawl(params: &LoadParams) -> Crawl {
     let mut c = Crawler {
         params,
         entry: entry.clone(),
+        entry_final: None,
+        root: params
+            .root
+            .as_ref()
+            .map(|r| crate::doc::normalize_path(&absolute(r))),
         docs: DocSet::default(),
         queue: VecDeque::new(),
         queued: HashSet::new(),

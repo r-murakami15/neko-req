@@ -48,6 +48,18 @@ pub async fn fetch_bytes(
     timeout: Duration,
     max_bytes: usize,
 ) -> Result<Vec<u8>, FetchError> {
+    fetch_bytes_at(url, bearer_token, timeout, max_bytes)
+        .await
+        .map(|(bytes, _)| bytes)
+}
+
+/// `fetch_bytes` に加えて、リダイレクトのあとの実際の URL（相対参照の基準）も返す。
+pub async fn fetch_bytes_at(
+    url: &url::Url,
+    bearer_token: Option<&str>,
+    timeout: Duration,
+    max_bytes: usize,
+) -> Result<(Vec<u8>, url::Url), FetchError> {
     let shown = clean_url(url);
     let fail = |message: String, status: Option<u16>| FetchError { message, status };
 
@@ -78,6 +90,7 @@ pub async fn fetch_bytes(
             None,
         )
     })?;
+    let final_url = resp.url().clone();
     let status = resp.status();
     if !status.is_success() {
         let hint = match status.as_u16() {
@@ -111,5 +124,5 @@ pub async fn fetch_bytes(
         }
         buf.extend_from_slice(&chunk);
     }
-    Ok(buf.to_vec())
+    Ok((buf.to_vec(), final_url))
 }

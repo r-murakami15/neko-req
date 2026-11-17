@@ -57,10 +57,8 @@ describe("外枠", () => {
     // 環境がまだないので選べない
     expect(within(header).getByLabelText("環境")).toBeDisabled();
     expect(within(header).getByRole("button", { name: "環境変数を編集" })).toBeEnabled();
-    // 未実装の操作は押せず、どのマイルストーンで入るかが分かる
-    const importButton = within(header).getByRole("button", { name: /OpenAPI取り込み/ });
-    expect(importButton).toBeDisabled();
-    expect(importButton).toHaveTextContent("M3 で実装");
+    // OpenAPI の取り込みは使える。設定はまだ押せず、どのマイルストーンで入るかが分かる
+    expect(within(header).getByRole("button", { name: /OpenAPI取り込み/ })).toBeEnabled();
     expect(within(header).getByRole("button", { name: /設定/ })).toBeDisabled();
     // エクスポートは v1 では出さない
     expect(screen.queryByText("エクスポート")).not.toBeInTheDocument();
@@ -79,8 +77,8 @@ describe("外枠", () => {
 
     await user.click(within(sidebar).getByRole("button", { name: "新規作成" }));
     const dialog = await screen.findByRole("dialog", { name: "新規作成" });
-    // OpenAPI・cURL はまだ使えない。フォルダのカードは v1 では出さない
-    expect(within(dialog).getByRole("button", { name: /OpenAPI から/ })).toBeDisabled();
+    // OpenAPI は取り込める。cURL はまだ使えない。フォルダのカードは v1 では出さない
+    expect(within(dialog).getByRole("button", { name: /OpenAPI から/ })).toBeEnabled();
     expect(within(dialog).getByRole("button", { name: "cURL から作成" })).toBeDisabled();
     expect(within(dialog).queryByText("フォルダ")).not.toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: /HTTP リクエスト/ }));

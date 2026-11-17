@@ -1,7 +1,9 @@
 //! スキーマの取り扱い。
 //!
 //! 1. `Inliner`: `$ref` を解決しながらスキーマをその場に展開する（`$ref` の名前は `x-nekoreq-ref` に残す。
-//!    循環は 2 回目で止めて `x-nekoreq-circular: true` を付ける。解決できないものは `x-nekoreq-unresolved`）。
+//!    循環は 2 回目で止めて `x-nekoreq-circular: true` を付ける。解決できないものは `x-nekoreq-unresolved`。
+//!    1 Operation あたりの展開ノード数・入れ子の深さに上限があり、超えたらそこで止めて
+//!    `x-nekoreq-truncated: true` を付ける）。
 //! 2. `schema_table`: 展開したスキーマから、深さつきの行のリスト（名前・型・必須・制約・説明）を作る。
 //!    allOf はまとめる。
 //! 3. `mock`: スキーマから例を作る（スキーマの example・default・enum があればそれを使う）。
@@ -17,6 +19,18 @@ use crate::pointer;
 pub const REF_KEY: &str = "x-nekoreq-ref";
 pub const CIRCULAR_KEY: &str = "x-nekoreq-circular";
 pub const UNRESOLVED_KEY: &str = "x-nekoreq-unresolved";
+/// 大きすぎて展開を打ち切った印。
+pub const TRUNCATED_KEY: &str = "x-nekoreq-truncated";
+
+/// スキーマ表の行の説明に入れる文言（展開を打ち切ったとき）。
+pub const TRUNCATED_NOTE: &str = "（大きすぎるため省略）";
+
+/// 1 Operation あたりに展開するスキーマのノード数の上限。扇状に `$ref` する定義が指数的に膨れるのを止める。
+pub const MAX_NODES: usize = 20_000;
+/// 1 Operation あたりに複製するデータ（example・enum など）のノード数の上限。
+const MAX_DATA_NODES: usize = 400_000;
+/// 展開するスキーマの入れ子の深さの上限（保存・表示で再帰が深くなりすぎないように）。
+const MAX_INLINE_DEPTH: usize = 100;
 
 /// 展開の深さの上限（循環以外の暴走防止）。
 const MAX_DEPTH: usize = 40;
@@ -60,6 +74,49 @@ pub struct Inliner<'a> {
     stack: Vec<(usize, String)>,
     pub issues: Vec<UnresolvedRef>,
     seen: HashSet<(String, usize, String)>,
+    /// 残りのスキーマのノード数・データのノード数・今の入れ子の深さ。
+    nodes_left: usize,
+    data_left: usize,
+    depth: usize,
+}
+
+/// 打ち切ったところに置く値。
+fn truncated_value() -> Value {
+    let mut o = Map::new();
+    o.insert(TRUNCATED_KEY.into(), Value::Bool(true));
+    Value::Object(o)
+}
+
+/// `v` の中のノード数（`cap` で数えるのをやめる）。
+fn count_nodes(v: &Value, cap: usize) -> usize {
+    fn go(v: &Value, n: &mut usize, cap: usize) {
+        *n += 1;
+        if *n >= cap {
+            return;
+        }
+        match v {
+            Value::Array(a) => {
+                for c in a {
+                    go(c, n, cap);
+                    if *n >= cap {
+                        return;
+                    }
+                }
+            }
+            Value::Object(m) => {
+                for c in m.values() {
+                    go(c, n, cap);
+                    if *n >= cap {
+                        return;
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    let mut n = 0;
+    go(v, &mut n, cap);
+    n
 }
 
 impl<'a> Inliner<'a> {
@@ -69,7 +126,28 @@ impl<'a> Inliner<'a> {
             stack: Vec::new(),
             issues: Vec::new(),
             seen: HashSet::new(),
+            nodes_left: MAX_NODES,
+            data_left: MAX_DATA_NODES,
+            depth: 0,
         }
+    }
+
+    /// 1 つの Operation（PathItem の共通パラメータを含む）の変換を始める。展開の上限を数え直す。
+    pub fn begin_operation(&mut self) {
+        self.nodes_left = MAX_NODES;
+        self.data_left = MAX_DATA_NODES;
+        self.depth = 0;
+        self.stack.clear();
+    }
+
+    /// 値をそのまま複製する（example・enum など）。複製した大きさを上限から引く。
+    fn clone_data(&mut self, v: &Value) -> Value {
+        if v.is_array() || v.is_object() {
+            self.data_left = self
+                .data_left
+                .saturating_sub(count_nodes(v, MAX_DATA_NODES + 1));
+        }
+        v.clone()
     }
 
     /// `file` に書かれたスキーマ `node`（ポインター `ptr`）を展開する。
@@ -77,15 +155,24 @@ impl<'a> Inliner<'a> {
         let Value::Object(m) = node else {
             return node.clone();
         };
-        if let Some(Value::String(r)) = m.get("$ref") {
-            return self.reference(file, m, r, ptr);
+        // 上限を超えたら、そこで止める（以降のノードも同じ）
+        if self.nodes_left == 0 || self.data_left == 0 || self.depth >= MAX_INLINE_DEPTH {
+            return truncated_value();
         }
-        let mut out = Map::with_capacity(m.len());
-        for (k, child) in m {
-            let cptr = pointer::child(ptr, k);
-            out.insert(k.clone(), self.keyword(file, k, child, &cptr));
-        }
-        Value::Object(out)
+        self.nodes_left -= 1;
+        self.depth += 1;
+        let v = if let Some(Value::String(r)) = m.get("$ref") {
+            self.reference(file, m, r, ptr)
+        } else {
+            let mut out = Map::with_capacity(m.len());
+            for (k, child) in m {
+                let cptr = pointer::child(ptr, k);
+                out.insert(k.clone(), self.keyword(file, k, child, &cptr));
+            }
+            Value::Object(out)
+        };
+        self.depth -= 1;
+        v
     }
 
     /// 解決できなかった `$ref` を記録する（同じ場所は 1 回だけ）。
@@ -126,7 +213,7 @@ impl<'a> Inliner<'a> {
                         .map(|(i, v)| self.inline(file, v, &pointer::child_index(ptr, i)))
                         .collect(),
                 ),
-                other => other.clone(),
+                other => self.clone_data(other),
             }
         } else if SCHEMA_MAP_KEYS.contains(&key) {
             match child {
@@ -137,10 +224,10 @@ impl<'a> Inliner<'a> {
                     }
                     Value::Object(out)
                 }
-                other => other.clone(),
+                other => self.clone_data(other),
             }
         } else {
-            child.clone()
+            self.clone_data(child)
         }
     }
 
@@ -241,7 +328,7 @@ fn merge_into(out: &mut Map<String, Value>, part: &Value) {
                 }
             }
             REF_KEY => {}
-            CIRCULAR_KEY => {
+            CIRCULAR_KEY | TRUNCATED_KEY => {
                 if !out.contains_key("properties") && !out.contains_key("type") {
                     out.insert(k.clone(), v.clone());
                 }
@@ -290,6 +377,11 @@ pub fn is_nullable(m: &Value) -> bool {
 
 pub fn is_circular(m: &Value) -> bool {
     m.get(CIRCULAR_KEY).and_then(Value::as_bool) == Some(true)
+}
+
+/// 大きすぎて展開を打ち切ったスキーマか。
+pub fn is_truncated(m: &Value) -> bool {
+    m.get(TRUNCATED_KEY).and_then(Value::as_bool) == Some(true)
 }
 
 /// 画面に出す型。`$ref` の名前があればそれ。
@@ -363,6 +455,8 @@ pub fn constraints(m: &Value) -> Vec<String> {
     if let Some(f) = str_of(m, "format") {
         out.push(format!("format: {f}"));
     }
+    // 3.0 の exclusiveMinimum / exclusiveMaximum は真偽値（minimum / maximum を含まない）。「> 0」「< 10」と出す
+    let exclusive = |key: &str| m.get(key).and_then(Value::as_bool) == Some(true);
     for (key, label) in [
         ("minimum", "min"),
         ("maximum", "max"),
@@ -377,11 +471,16 @@ pub fn constraints(m: &Value) -> Vec<String> {
         ("maxProperties", "maxProperties"),
     ] {
         if let Some(v) = m.get(key) {
-            // 3.0 の exclusiveMinimum は真偽値
             if v.is_boolean() {
                 continue;
             }
-            out.push(format!("{label}: {}", fmt_value(v)));
+            if key == "minimum" && exclusive("exclusiveMinimum") {
+                out.push(format!("> {}", fmt_value(v)));
+            } else if key == "maximum" && exclusive("exclusiveMaximum") {
+                out.push(format!("< {}", fmt_value(v)));
+            } else {
+                out.push(format!("{label}: {}", fmt_value(v)));
+            }
         }
     }
     if let Some(p) = str_of(m, "pattern") {
@@ -404,6 +503,9 @@ pub fn constraints(m: &Value) -> Vec<String> {
     }
     if is_circular(m) {
         out.push("循環".into());
+    }
+    if is_truncated(m) {
+        out.push("省略".into());
     }
     out
 }
@@ -449,6 +551,11 @@ fn example_text(m: &Value) -> Option<String> {
 }
 
 fn row_for(name: &str, m: &Value, required: bool, depth: usize) -> SchemaRow {
+    let description = match (str_of(m, "description"), is_truncated(m)) {
+        (Some(d), true) => Some(format!("{TRUNCATED_NOTE} {d}")),
+        (None, true) => Some(TRUNCATED_NOTE.to_string()),
+        (d, false) => d.map(str::to_string),
+    };
     SchemaRow {
         depth: depth_u32(depth),
         name: name.to_string(),
@@ -457,7 +564,7 @@ fn row_for(name: &str, m: &Value, required: bool, depth: usize) -> SchemaRow {
         required,
         nullable: is_nullable(m),
         constraints: constraints(m),
-        description: str_of(m, "description").map(str::to_string),
+        description,
         example: example_text(m),
         ref_name: str_of(m, REF_KEY).map(str::to_string),
         circular: is_circular(m),
@@ -465,7 +572,7 @@ fn row_for(name: &str, m: &Value, required: bool, depth: usize) -> SchemaRow {
 }
 
 fn push_children(m: &Value, depth: usize, rows: &mut Vec<SchemaRow>) {
-    if is_circular(m) || depth > 60 {
+    if is_circular(m) || is_truncated(m) || depth > 60 {
         return;
     }
     match kind(m) {
@@ -527,19 +634,26 @@ pub struct Mock {
 /// スキーマから例を作る。`for_request` が true のときは readOnly の項目を除き、false のときは writeOnly を除く。
 pub fn mock(schema: &Value, for_request: bool) -> Mock {
     let mut used = false;
-    let value = gen(schema, 0, for_request, &mut used);
+    let mut budget = MOCK_NODES;
+    let value = gen(schema, 0, for_request, &mut used, &mut budget);
     Mock {
         value,
         used_schema_example: used,
     }
 }
 
-fn gen(s: &Value, depth: usize, req: bool, used: &mut bool) -> Value {
-    if depth > 14 {
+/// モックで作る値のノード数の上限（minItems を重ねて膨れないように）。
+const MOCK_NODES: usize = 5_000;
+/// モックの配列の要素数の上限。
+const MOCK_ITEMS: u64 = 10;
+
+fn gen(s: &Value, depth: usize, req: bool, used: &mut bool, budget: &mut usize) -> Value {
+    if depth > 14 || *budget == 0 {
         return Value::Null;
     }
+    *budget -= 1;
     let m = merge_all_of(s);
-    if is_circular(&m) || m.get(UNRESOLVED_KEY).is_some() {
+    if is_circular(&m) || is_truncated(&m) || m.get(UNRESOLVED_KEY).is_some() {
         return Value::Null;
     }
     if let Some(e) = m.get("example").or_else(|| {
@@ -575,7 +689,7 @@ fn gen(s: &Value, depth: usize, req: bool, used: &mut bool) -> Value {
             .iter()
             .find(|a| a.get("type").and_then(Value::as_str) != Some("null"))
             .or_else(|| alts.first());
-        return pick.map_or(Value::Null, |a| gen(a, depth + 1, req, used));
+        return pick.map_or(Value::Null, |a| gen(a, depth + 1, req, used, budget));
     }
     match base_type(&m).as_str() {
         "object" => {
@@ -588,15 +702,28 @@ fn gen(s: &Value, depth: usize, req: bool, used: &mut bool) -> Value {
                     if (req && ro) || (!req && wo) {
                         continue;
                     }
-                    out.insert(name.clone(), gen(&pm, depth + 1, req, used));
+                    out.insert(name.clone(), gen(&pm, depth + 1, req, used, budget));
                 }
             }
             Value::Object(out)
         }
-        "array" => match m.get("items") {
-            Some(items) => Value::Array(vec![gen(items, depth + 1, req, used)]),
-            None => Value::Array(vec![]),
-        },
+        "array" => {
+            let min = m.get("minItems").and_then(Value::as_u64).unwrap_or(0);
+            let max = m.get("maxItems").and_then(Value::as_u64);
+            // 既定は 1 要素。minItems があればその数、maxItems を超えない
+            let mut n = min.clamp(1, MOCK_ITEMS);
+            if let Some(max) = max {
+                n = n.min(max);
+            }
+            match m.get("items") {
+                Some(items) => Value::Array(
+                    (0..n)
+                        .map(|_| gen(items, depth + 1, req, used, budget))
+                        .collect(),
+                ),
+                None => Value::Array(vec![]),
+            }
+        }
         "string" => Value::String(string_example(&m)),
         "integer" => json!(number_floor(&m)),
         "number" => json!(number_floor(&m)),
@@ -606,15 +733,40 @@ fn gen(s: &Value, depth: usize, req: bool, used: &mut bool) -> Value {
     }
 }
 
+/// 数値の例。下限があれば下限、なければ 0。上限（`maximum`・`exclusiveMaximum`）を超えないようにする。
+/// 3.0 の真偽値の `exclusiveMinimum` / `exclusiveMaximum` も見る。
 fn number_floor(m: &Value) -> i64 {
     let num = |k: &str| m.get(k).and_then(Value::as_f64);
+    let flag = |k: &str| m.get(k).and_then(Value::as_bool) == Some(true);
+    let mut lo: Option<i64> = None;
     if let Some(v) = num("minimum") {
-        return v.ceil() as i64;
+        lo = Some(if flag("exclusiveMinimum") {
+            v.floor() as i64 + 1
+        } else {
+            v.ceil() as i64
+        });
     }
     if let Some(v) = num("exclusiveMinimum") {
-        return v.floor() as i64 + 1;
+        let e = v.floor() as i64 + 1;
+        lo = Some(lo.map_or(e, |l| l.max(e)));
     }
-    0
+    let mut hi: Option<i64> = None;
+    if let Some(v) = num("maximum") {
+        hi = Some(if flag("exclusiveMaximum") {
+            v.ceil() as i64 - 1
+        } else {
+            v.floor() as i64
+        });
+    }
+    if let Some(v) = num("exclusiveMaximum") {
+        let e = v.ceil() as i64 - 1;
+        hi = Some(hi.map_or(e, |h| h.min(e)));
+    }
+    match (lo, hi) {
+        (Some(l), _) => l,
+        (None, Some(h)) if h < 0 => h,
+        _ => 0,
+    }
 }
 
 fn string_example(m: &Value) -> String {

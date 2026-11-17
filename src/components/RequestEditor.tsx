@@ -1,15 +1,17 @@
 import { useMemo, useState } from "react";
 
 import { errorMessage, useBackend } from "../api";
-import { useEnvironments, usePreview, useSaveTab } from "../api/queries";
-import type { AuthOverride, Body, Project, RequestSpec } from "../bindings";
-import { countActive, METHODS } from "../lib/spec";
+import { useEnvironments, useOperationDetail, usePreview, useSaveDraft, useSaveTab } from "../api/queries";
+import type { Body, Project, RequestSpec } from "../bindings";
+import { PARAM_IN_LABEL } from "../lib/opkey";
+import { countActive, emptyRequiredParams, METHODS, type ParamMeta, specForSend } from "../lib/spec";
 import { describeLocation, indexUnresolved, type Section, splitVars } from "../lib/vars";
 import { cancelTab, sendTab } from "../store/send";
 import { type RequestPane, type RequestTab, useTabsStore } from "../store/tabs";
 import { ArrowRightIcon } from "./Icons";
-import { AuthPanel, defaultAuth } from "./AuthPanel";
+import { AuthPanel, type AuthKind, defaultAuth } from "./AuthPanel";
 import { BodyPanel, defaultBody } from "./BodyPanel";
+import { DesignPanel } from "./DesignPanel";
 import { HeadersPanel } from "./HeadersPanel";
 import { ParamsPanel } from "./ParamsPanel";
 import { ResponsePane } from "./ResponsePane";
@@ -23,10 +25,27 @@ export function RequestEditor({ project, tab }: { project: Project; tab: Request
   const patch = useTabsStore((s) => s.patch);
   const setSaveDialogTab = useTabsStore((s) => s.setSaveDialogTab);
   const saveTab = useSaveTab();
+  const saveDraft = useSaveDraft();
   const [saveError, setSaveError] = useState<string | null>(null);
 
+  const op = tab.op;
+  const opKey = op?.opKey ?? null;
+  const detail = useOperationDetail(project.id, opKey);
+  // yaml の API: 「yaml にない」パラメータは、有効にしてあっても送らない
+  const sendSpec = useMemo(() => specForSend(tab.spec, op?.missingInYaml ?? []), [tab.spec, op?.missingInYaml]);
+  const paramMeta: ParamMeta | undefined = useMemo(
+    () => (op ? { docs: detail.data?.parameters ?? [], missing: op.missingInYaml, required: op.requiredParams } : undefined),
+    [op, detail.data],
+  );
+  const emptyRequired = useMemo(() => (op ? emptyRequiredParams(tab.spec, op.requiredParams) : []), [op, tab.spec]);
+  // スキーマだけから生成した JSON の例（ボディの「スキーマから例を生成」）
+  const schemaExample = useMemo(() => {
+    const media = detail.data?.requestBody?.contents.find((c) => /json/i.test(c.contentType));
+    return media && media.generatedExample !== null ? JSON.stringify(media.generatedExample, null, 2) : null;
+  }, [detail.data]);
+
   const refreshKey = `${project.defaultEnvironmentId ?? ""}:${envs.dataUpdatedAt}`;
-  const { preview } = usePreview(project.id, tab.spec, refreshKey);
+  const { preview } = usePreview(project.id, sendSpec, refreshKey, opKey);
   const unresolved = useMemo(() => indexUnresolved(preview?.unresolved ?? []), [preview]);
   const unresolvedNames = useMemo(() => new Set((preview?.unresolved ?? []).map((u) => u.name)), [preview]);
 
@@ -38,11 +57,16 @@ export function RequestEditor({ project, tab }: { project: Project; tab: Request
 
   const send = () => {
     if (!canSend) return;
-    void sendTab(backend, tab.id, { projectId: project.id, environmentId: null, request: tab.spec, overrides: [] }, envName);
+    void sendTab(backend, tab.id, { projectId: project.id, environmentId: null, request: sendSpec, overrides: [], opKey }, envName);
   };
 
   const save = () => {
     setSaveError(null);
+    if (op) {
+      // yaml の API は、タグでフォルダが決まるので、保存ダイアログは出さずにそのまま保存する
+      saveDraft.mutate(tab, { onError: (e) => setSaveError(errorMessage(e)) });
+      return;
+    }
     if (tab.adhocId === null) {
       setSaveDialogTab(tab.id);
       return;
@@ -56,11 +80,16 @@ export function RequestEditor({ project, tab }: { project: Project; tab: Request
     patch(tab.id, { bodyStash: stash });
     updateSpec(tab.id, (s) => ({ ...s, body: stash[kind] ?? defaultBody(kind) }));
   };
-  const onAuthKind = (type: AuthOverride["type"]) => {
+  const onAuthKind = (kind: AuthKind) => {
     const current = tab.spec.auth;
     const stash = current ? { ...tab.authStash, [current.type]: current } : tab.authStash;
     patch(tab.id, { authStash: stash });
-    updateSpec(tab.id, (s) => ({ ...s, auth: stash[type] ?? defaultAuth(type) }));
+    // 「プロジェクトの既定を使う」は、認証の上書きなし（null）= yaml の security に従う
+    updateSpec(tab.id, (s) => ({ ...s, auth: kind === "default" ? null : (stash[kind] ?? defaultAuth(kind)) }));
+  };
+  const applyExample = (json: string) => {
+    updateSpec(tab.id, (s) => ({ ...s, body: { kind: "json", value: json } }));
+    patch(tab.id, { requestPane: "body" });
   };
 
   const paramCount = countActive(tab.spec.params, ["query", "path", "cookie"]);
@@ -73,6 +102,8 @@ export function RequestEditor({ project, tab }: { project: Project; tab: Request
     { id: "design", label: "設計" },
   ];
 
+  // yaml の API の設計タブは、画面イメージのとおり幅いっぱいに読ませる（レスポンス欄は隠す）
+  const designFull = op !== null && tab.requestPane === "design";
   const urlBad = unresolved.url.size > 0;
   const showUrlError = preview?.urlError && tab.spec.url.trim() !== "";
 
@@ -86,6 +117,8 @@ export function RequestEditor({ project, tab }: { project: Project; tab: Request
               aria-label="HTTPメソッド"
               data-method={tab.spec.method}
               value={tab.spec.method}
+              disabled={op !== null}
+              title={op ? "OpenAPI の API の method は yaml で決まります" : undefined}
               onChange={(e) => onSpec((s) => ({ ...s, method: e.target.value }))}
             >
               {METHODS.map((m) => (
@@ -100,6 +133,8 @@ export function RequestEditor({ project, tab }: { project: Project; tab: Request
               placeholder="{{baseUrl}}/api/v1/..."
               value={tab.spec.url}
               unresolved={unresolved.url}
+              readOnly={op !== null}
+              title={op ? "OpenAPI の API の URL は yaml で決まります（{{baseUrl}} は環境変数）" : undefined}
               onChange={(url) => onSpec((s) => ({ ...s, url }))}
               onKeyDown={(e) => {
                 if (e.key === "Enter") send();
@@ -116,7 +151,7 @@ export function RequestEditor({ project, tab }: { project: Project; tab: Request
               送信
             </button>
           )}
-          <button type="button" className="btn btn-save" onClick={save} disabled={saveTab.isPending}>
+          <button type="button" className="btn btn-save" onClick={save} disabled={saveTab.isPending || saveDraft.isPending}>
             保存
           </button>
         </div>
@@ -166,6 +201,14 @@ export function RequestEditor({ project, tab }: { project: Project; tab: Request
             パスパラメータの値が空です: {preview.missingPathParams.map((n) => `{${n}}`).join("、")}（そのまま送られます）
           </div>
         )}
+        {op?.deleted && (
+          <div className="alert alert-warn">この API は yaml から削除されました。入力値は残してあります（サイドバーの「削除された API」から消せます）。</div>
+        )}
+        {emptyRequired.length > 0 && (
+          <div className="alert alert-warn" role="status">
+            必須（required）の項目が空か無効です: {emptyRequired.map((r) => `${r.name}（${PARAM_IN_LABEL[r.location]}）`).join("、")}（送信はできます）
+          </div>
+        )}
         {saveError && (
           <div className="alert alert-danger" role="alert">
             保存できませんでした: {saveError}
@@ -173,7 +216,7 @@ export function RequestEditor({ project, tab }: { project: Project; tab: Request
         )}
       </div>
 
-      <div className="panes">
+      <div className={`panes${designFull ? " is-design" : ""}`}>
         <section className="pane pane-request" aria-label="リクエスト">
           <div className="pane-tabs" role="tablist" aria-label="リクエスト設定">
             {tabs.map((t) => (
@@ -195,25 +238,21 @@ export function RequestEditor({ project, tab }: { project: Project; tab: Request
             ))}
           </div>
           <div className="pane-body" role="tabpanel">
-            {tab.requestPane === "params" && <ParamsPanel spec={tab.spec} onChange={onSpec} unresolved={unresolved} />}
+            {tab.requestPane === "params" && <ParamsPanel spec={tab.spec} onChange={onSpec} unresolved={unresolved} meta={paramMeta} />}
             {tab.requestPane === "headers" && (
-              <HeadersPanel spec={tab.spec} onChange={onSpec} unresolved={unresolved} autoHeaders={preview?.autoHeaders ?? []} />
+              <HeadersPanel spec={tab.spec} onChange={onSpec} unresolved={unresolved} autoHeaders={preview?.autoHeaders ?? []} meta={paramMeta} />
             )}
-            {tab.requestPane === "body" && <BodyPanel tab={tab} onSpec={onSpec} onKind={onBodyKind} unresolved={unresolved} />}
+            {tab.requestPane === "body" && (
+              <BodyPanel tab={tab} onSpec={onSpec} onKind={onBodyKind} unresolved={unresolved} schemaExample={op ? schemaExample : null} />
+            )}
             {tab.requestPane === "auth" && (
               <AuthPanel tab={tab} onSpec={onSpec} onKind={onAuthKind} unresolved={unresolved} autoHeaders={preview?.autoHeaders ?? []} />
             )}
-            {tab.requestPane === "design" && (
-              <div className="panel">
-                <div className="pane-placeholder">
-                  設計タブ（OpenAPI の説明・スキーマ・ステータスごとの応答）は M4 で実装します。OpenAPI を取り込んだ API で、ここに表示されます。
-                </div>
-              </div>
-            )}
+            {tab.requestPane === "design" && <DesignPanel tab={tab} onApplyBody={applyExample} />}
           </div>
         </section>
 
-        <ResponsePane tab={tab} />
+        {!designFull && <ResponsePane tab={tab} />}
       </div>
     </>
   );

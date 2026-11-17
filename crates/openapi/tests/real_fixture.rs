@@ -44,14 +44,22 @@ fn tags(l: &Loaded) -> BTreeSet<String> {
         .collect()
 }
 
-/// 分割版と bundle 版で、共通の Operation の中身（parameters・requestBody・responses など）が一致すること。
-///
-/// 手元の fixture は、bundle 版（openapi.bundled.yaml）が分割版より古く、分割版にない 2 件
-/// （createFileUploadUrl・getFileDownloadUrl）が bundle 版にだけ残っている（分割版は 86 件、bundle 版は 88 件）。
-/// そのため「同じ 88 件」ではなく、「分割版の 86 件がすべて bundle 版にあり、内容も同じ。差の 2 件は分割版の
-/// どのファイルにも書かれていない」ことを確かめる。
+/// 数値を f64 にそろえた JSON にする（`25.0` と `25` を同じ値として比べるため）。
+fn norm<T: serde::Serialize>(v: &T) -> serde_json::Value {
+    fn walk(v: serde_json::Value) -> serde_json::Value {
+        match v {
+            serde_json::Value::Number(n) => serde_json::json!(n.as_f64()),
+            serde_json::Value::Array(a) => a.into_iter().map(walk).collect(),
+            serde_json::Value::Object(o) => o.into_iter().map(|(k, v)| (k, walk(v))).collect(),
+            x => x,
+        }
+    }
+    walk(serde_json::to_value(v).unwrap())
+}
+
+/// 分割版と bundle 版のどちらから読んでも、同じ件数の Operation が同じ中身で並ぶこと（M3 の完了条件）。
 #[tokio::test]
-async fn split_and_bundled_agree_on_every_common_operation() {
+async fn split_and_bundled_have_the_same_operations() {
     let split = need!(split_entry(), "NEKOREQ_FIXTURE_DIR");
     let bundled = need!(bundled_entry(), "NEKOREQ_FIXTURE_BUNDLED");
 
@@ -72,82 +80,31 @@ async fn split_and_bundled_agree_on_every_common_operation() {
         bundled_time,
         b.elapsed_ms
     );
-    assert_eq!(a.operations.len(), 86);
-    assert_eq!(b.operations.len(), 88);
-    assert!(
-        ids(&a).is_subset(&ids(&b)),
-        "分割版の operationId はすべて bundle 版にある"
-    );
-    let extra: Vec<String> = ids(&b).difference(&ids(&a)).cloned().collect();
-    assert_eq!(extra, vec!["createFileUploadUrl", "getFileDownloadUrl"]);
-    // 差の 2 件は、分割版のどのファイルにも書かれていない（読み込みの取りこぼしではない）
-    let dir = split.parent().unwrap().to_path_buf();
-    let mut all_text = String::new();
-    let mut stack = vec![dir.to_path_buf()];
-    while let Some(d) = stack.pop() {
-        for e in std::fs::read_dir(&d).unwrap().flatten() {
-            let p = e.path();
-            if p.is_dir() {
-                stack.push(p);
-            } else if p.extension().is_some_and(|x| x == "yaml") {
-                all_text.push_str(&std::fs::read_to_string(&p).unwrap());
-            }
-        }
-    }
-    for id in &extra {
-        assert!(
-            !all_text.contains(id.as_str()),
-            "{id} が分割版のファイルにある"
-        );
-    }
-    assert_eq!(tags(&a).len(), 18);
-    assert!(tags(&a).is_subset(&tags(&b)));
+    // M3 の完了条件: 分割版と bundle 版のどちらから読んでも、同じ件数・同じ API・同じ中身になる。
+    assert_eq!(a.operations.len(), b.operations.len());
+    assert_eq!(ids(&a), ids(&b), "operationId の集合が一致する");
+    assert_eq!(tags(&a), tags(&b), "タグの集合が一致する");
     assert!(a.operations.iter().all(|o| o.operation_id.is_some()));
-    // 共通の 86 件: method・path・タグ・summary・parameters・security はすべて一致する。
-    // description・requestBody・responses が違うのは 6 件だけ（bundle 版が古いため）。
-    let mut stale: Vec<String> = Vec::new();
     for oa in &a.operations {
         let ob = op(&b, &oa.op_key.to_string());
-        assert_eq!(oa.method, ob.method);
-        assert_eq!(oa.path, ob.path);
+        assert_eq!(oa.method, ob.method, "{}", oa.op_key);
+        assert_eq!(oa.path, ob.path, "{}", oa.op_key);
         assert_eq!(oa.tags, ob.tags, "{}", oa.op_key);
         assert_eq!(oa.summary, ob.summary, "{}", oa.op_key);
-        assert_eq!(oa.parameters, ob.parameters, "{}", oa.op_key);
+        assert_eq!(oa.description, ob.description, "{}", oa.op_key);
         assert_eq!(oa.security, ob.security, "{}", oa.op_key);
-        if oa.content_hash == ob.content_hash {
-            assert_eq!(oa.description, ob.description);
-            assert_eq!(oa.request_body, ob.request_body);
-            assert_eq!(oa.responses, ob.responses);
-        } else {
-            stale.push(oa.op_key.to_string());
+        // bundler（redocly）は `example: 25.00` を `25` に書き換えるので、数値は値として比べる
+        for (what, x, y) in [
+            ("parameters", norm(&oa.parameters), norm(&ob.parameters)),
+            (
+                "requestBody",
+                norm(&oa.request_body),
+                norm(&ob.request_body),
+            ),
+            ("responses", norm(&oa.responses), norm(&ob.responses)),
+        ] {
+            assert_eq!(x, y, "{} の {what}", oa.op_key);
         }
-    }
-    eprintln!(
-        "bundle 版と内容が違う Operation（{} 件）: {stale:?}",
-        stale.len()
-    );
-    assert_eq!(
-        stale,
-        vec![
-            "createContract",
-            "updateContract",
-            "getInvoiceList",
-            "getCompanyPayoutDetail",
-            "createPayoutNotice",
-            "getWriterPayoutDetail"
-        ]
-    );
-    // その 6 件が書かれた分割版のファイルは、bundle 版より新しい（bundle 版が古い証拠）
-    let bundle_mtime = std::fs::metadata(&bundled).unwrap().modified().unwrap();
-    for key in &stale {
-        let o = op(&a, key);
-        let f = dir.join(o.source_file.as_ref().unwrap());
-        let m = std::fs::metadata(&f).unwrap().modified().unwrap();
-        assert!(
-            m > bundle_mtime,
-            "{key}: {} は bundle 版より新しくない",
-            f.display()
-        );
     }
     assert_eq!(a.meta.title, b.meta.title);
     assert_eq!(a.meta.version, b.meta.version);
@@ -351,6 +308,35 @@ async fn bundled_matches_what_roas_reads() {
             )
         })
         .collect();
-    assert_eq!(theirs.len(), 88);
     assert_eq!(theirs, ours);
+}
+
+/// 展開ノード数の上限（Operation あたり）に、実際の API 定義が当たらないこと。
+#[tokio::test]
+async fn real_operations_do_not_hit_the_expansion_limit() {
+    for (name, entry) in [("分割", split_entry()), ("bundle", bundled_entry())] {
+        let Some(entry) = entry else {
+            eprintln!("{name} の fixture が無いのでスキップ");
+            continue;
+        };
+        let t = Instant::now();
+        let l = loaded(&entry).await;
+        let elapsed = t.elapsed();
+        let hit: Vec<String> = l
+            .operations
+            .iter()
+            .filter(|o| {
+                serde_json::to_string(o)
+                    .unwrap()
+                    .contains("x-nekoreq-truncated")
+            })
+            .map(|o| o.op_key.to_string())
+            .collect();
+        eprintln!(
+            "{name}: {} 件・{elapsed:?}・打ち切り {}",
+            l.operations.len(),
+            hit.len()
+        );
+        assert!(hit.is_empty(), "上限に当たった: {hit:?}");
+    }
 }

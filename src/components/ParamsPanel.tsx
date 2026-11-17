@@ -1,5 +1,5 @@
-import type { RequestSpec } from "../bindings";
-import { newKeyValue, replaceRows, rowsOf } from "../lib/spec";
+import type { KeyValue, RequestSpec } from "../bindings";
+import { newKeyValue, type ParamMeta, replaceRows, rowInfoFor, rowsOf } from "../lib/spec";
 import { type UnresolvedIndex, pathParamNames } from "../lib/vars";
 import { KeyValueTable } from "./KeyValueTable";
 
@@ -7,10 +7,13 @@ interface Props {
   spec: RequestSpec;
   onChange: (update: (spec: RequestSpec) => RequestSpec) => void;
   unresolved: UnresolvedIndex;
+  /** yaml の API のとき: 説明・必須・「yaml にない」の表示（表示専用）。 */
+  meta?: ParamMeta;
 }
 
 /** パラメータのタブ（クエリ・パス・Cookie）。 */
-export function ParamsPanel({ spec, onChange, unresolved }: Props) {
+export function ParamsPanel({ spec, onChange, unresolved, meta }: Props) {
+  const info = meta ? (item: KeyValue) => rowInfoFor(meta, item) : undefined;
   const path = rowsOf(spec.params, "path");
   const missingRows = pathParamNames(spec.url).filter((n) => !path.some((r) => r.name === n));
 
@@ -24,6 +27,7 @@ export function ParamsPanel({ spec, onChange, unresolved }: Props) {
           items={rowsOf(spec.params, "query")}
           onChange={(next) => onChange((s) => ({ ...s, params: replaceRows(s.params, "query", next) }))}
           unresolved={(row, part) => unresolved.param("query", row, part)}
+          info={info}
         />
       </section>
 
@@ -57,6 +61,7 @@ export function ParamsPanel({ spec, onChange, unresolved }: Props) {
           items={path}
           onChange={(next) => onChange((s) => ({ ...s, params: replaceRows(s.params, "path", next) }))}
           unresolved={(row, part) => unresolved.param("path", row, part)}
+          info={info}
         />
       </section>
 
@@ -68,6 +73,7 @@ export function ParamsPanel({ spec, onChange, unresolved }: Props) {
           items={rowsOf(spec.params, "cookie")}
           onChange={(next) => onChange((s) => ({ ...s, params: replaceRows(s.params, "cookie", next) }))}
           unresolved={(row, part) => unresolved.param("cookie", row, part)}
+          info={info}
         />
       </section>
     </div>

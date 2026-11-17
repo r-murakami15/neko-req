@@ -4,15 +4,11 @@ import { useUiStore } from "../store/ui";
 import { DownloadIcon, GearIcon, PencilIcon, CatLogo } from "./Icons";
 import { ProjectSwitcher } from "./ProjectSwitcher";
 
-/** まだ使えない操作の見た目。押せず、何のマイルストーンで入るかを title と印で示す。 */
-function Pending({ milestone }: { milestone: string }) {
-  return <span className="pending-badge">{milestone}</span>;
-}
-
 export function Header({ projects, current }: { projects: Project[]; current: Project }) {
   const envs = useEnvironments(current.id);
   const select = useSelectEnvironment(current.id);
   const setScreen = useUiStore((s) => s.setScreen);
+  const setImportDialogOpen = useUiStore((s) => s.setImportDialogOpen);
   const choices = (envs.data ?? []).filter((e) => !e.isGlobal);
 
   return (
@@ -24,6 +20,11 @@ export function Header({ projects, current }: { projects: Project[]; current: Pr
           /
         </span>
         <ProjectSwitcher projects={projects} current={current} />
+        {current.source && (
+          <span className="brand-meta">
+            {current.source.meta?.version ? `v${current.source.meta.version} · ` : ""}OpenAPI {current.source.openapiVersion}
+          </span>
+        )}
       </div>
 
       <label className="env-select">
@@ -46,10 +47,9 @@ export function Header({ projects, current }: { projects: Project[]; current: Pr
       <button type="button" className="btn btn-icon" aria-label="環境変数を編集" title="環境変数を編集" onClick={() => setScreen("environments")}>
         <PencilIcon />
       </button>
-      <button type="button" className="btn" disabled title="OpenAPI の取り込みは M3 で実装">
+      <button type="button" className="btn" title="OpenAPI（yaml / json）を取り込む" onClick={() => setImportDialogOpen(true)}>
         <DownloadIcon />
         OpenAPI取り込み
-        <Pending milestone="M3 で実装" />
       </button>
       <button type="button" className="btn btn-icon" disabled aria-label="設定（M6 で実装）" title="設定は M6 で実装">
         <GearIcon />

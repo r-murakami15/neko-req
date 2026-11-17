@@ -1011,7 +1011,7 @@ async fn foreign_host_reference_waits_for_confirmation_in_the_app_and_is_remembe
         "paths:\n  /a:\n    get:\n      operationId: getA\n      responses:\n        '200':\n          description: ok\n"
     )).mount(&other).await;
     let url = format!("{}/openapi.yaml", main.uri());
-    let host = other.uri().trim_start_matches("http://").to_string();
+    let host = other.uri();
     let PreviewResult::NeedsConfirmation { foreign } = f
         .state
         .openapi_preview(
@@ -1095,10 +1095,8 @@ async fn real_fixture_import_get_client_list_and_send() {
         operation_count, preview.file_count
     );
     assert!(import_time < Duration::from_secs(2), "{import_time:?}");
-    assert_eq!(
-        operation_count, 86,
-        "分割版のファイルに書かれている数（bundle 版は古く 88 件）"
-    );
+    let split_count = operation_count;
+    assert!(split_count > 0);
     assert_eq!(created_environments, vec!["ローカル (Dev Container)"]);
     let envs = f.state.env_list(&project.id).unwrap();
     let local = envs
@@ -1109,7 +1107,10 @@ async fn real_fixture_import_get_client_list_and_send() {
         local.vars[0].value,
         VarValue::Plain("http://localhost:8080".into())
     );
-    assert_eq!(f.state.operation_list(&project.id).unwrap().len(), 86);
+    assert_eq!(
+        f.state.operation_list(&project.id).unwrap().len(),
+        split_count as usize
+    );
 
     // 「取引先一覧取得」がそのまま送れる
     let get = key("getClientList");
@@ -1148,7 +1149,7 @@ async fn real_fixture_import_get_client_list_and_send() {
     let list = f.state.operation_list(&project.id).unwrap();
     assert_eq!(list.iter().filter(|i| !i.requires_auth).count(), 6);
 
-    // bundle 版も取り込める（古いぶん 2 件多い）
+    // bundle 版から取り込んでも同じ件数になる
     let ImportResult::Imported {
         operation_count, ..
     } = f
@@ -1159,7 +1160,7 @@ async fn real_fixture_import_get_client_list_and_send() {
     else {
         panic!()
     };
-    assert_eq!(operation_count, 88);
+    assert_eq!(operation_count, split_count);
 }
 
 // 実際のファイルの 1 つを書き換えた一時コピーで、description の変更が「変更」になる

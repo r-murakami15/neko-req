@@ -1,4 +1,4 @@
-import { ApiError, type Backend } from "../api/backend";
+import { ApiError, type Backend, type PickKind } from "../api/backend";
 import type {
   AdHocRequest,
   AppError,
@@ -7,12 +7,15 @@ import type {
   HeaderPair,
   Project,
   RequestFinished,
+  RequestDraft,
   RequestInput,
+  RequestSpec,
   ResponseData,
   SendOutcome,
   Timing,
 } from "../bindings";
 import { assemble, type Lookup } from "./build";
+import { createOpenApiMock, type MockControls } from "./openapiBackend";
 
 /** Rust 側（nekoreq-storage）と同じ上限。 */
 const MAX_PROJECT_NAME_CHARS = 100;
@@ -97,7 +100,9 @@ const REASONS: Record<number, string> = { 200: "OK", 400: "Bad Request", 500: "I
  * `/error`（400 の problem+json）、`/server-error`（500）、`/timeout`・`/refused`（失敗）、
  * `/large`（先頭だけの長いボディ）、`/text`（テキスト）、`/binary`（バイナリ）。
  */
-export function createMockBackend(initial: Project[] = [], options: MockOptions = {}): Backend {
+export type MockBackend = Backend & { mock: MockControls };
+
+export function createMockBackend(initial: Project[] = [], options: MockOptions = {}): MockBackend {
   const sendDelayMs = options.sendDelayMs ?? 400;
   let projects: Project[] = [...initial];
   let seq = projects.length;
@@ -112,6 +117,7 @@ export function createMockBackend(initial: Project[] = [], options: MockOptions 
   const newId = (prefix: string) => `${prefix}-${(nextId += 1)}`;
 
   const now = () => new Date().toISOString();
+  const drafts = new Map<string, RequestDraft>();
 
   const projectOf = (id: string): Project => {
     const p = projects.find((x) => x.id === id);
@@ -157,6 +163,66 @@ export function createMockBackend(initial: Project[] = [], options: MockOptions 
       }
       return undefined;
     };
+  }
+
+  function createProject(name: string): Project {
+    const normalized = normalizeName(name);
+    seq += 1;
+    const ts = now();
+    const project: Project = {
+      id: `mock-project-${seq}`,
+      name: normalized,
+      source: null,
+      defaultEnvironmentId: null,
+      createdAt: ts,
+      updatedAt: ts,
+    };
+    projects.push(project);
+    ensureGlobal(project.id);
+    return { ...project };
+  }
+
+  function addEnvironment(projectId: string, name: string, baseUrl: string): boolean {
+    ensureGlobal(projectId);
+    if (envs.some((e) => e.projectId === projectId && !e.isGlobal && e.name === name)) return false;
+    const ts = now();
+    const env: Environment = {
+      id: newId("mock-env"),
+      projectId,
+      name,
+      isGlobal: false,
+      vars: [{ name: "baseUrl", value: { kind: "plain", value: baseUrl }, description: "", enabled: true }],
+      createdAt: ts,
+      updatedAt: ts,
+    };
+    envs.push(env);
+    if (projectOf(projectId).defaultEnvironmentId === null) setDefault(projectId, env.id);
+    return true;
+  }
+
+  const openapi = createOpenApiMock(
+    {
+      projectOf: (id) => clone(projectOf(id)),
+      createProject,
+      updateProject: (p) => {
+        const i = projects.findIndex((x) => x.id === p.id);
+        if (i >= 0) projects[i] = clone(p);
+      },
+      addEnvironment,
+      newId,
+      now,
+    },
+    drafts,
+  );
+
+  /** `request.auth` が `None` で `opKey` があれば、yaml の security に従った既定の認証にする（モック）。 */
+  function effectiveSpec(input: RequestInput, lookup: Lookup): RequestSpec {
+    const spec = input.request;
+    if (spec.auth !== null || !input.opKey) return spec;
+    const variable = openapi.defaultAuthName(input.projectId, input.opKey);
+    // 使う変数が展開できないときは認証なしで送る
+    if (!variable || !lookup(variable)) return spec;
+    return { ...spec, auth: { type: "apiKey", location: "cookie", name: "SESSION", value: `{{${variable}}}` } };
   }
 
   const emit = (event: RequestFinished) => {
@@ -256,7 +322,7 @@ export function createMockBackend(initial: Project[] = [], options: MockOptions 
     return { status: "success", response };
   }
 
-  return {
+  const backend: Backend = {
     async appInfo(): Promise<AppInfo> {
       return {
         name: "NekoReq",
@@ -273,20 +339,7 @@ export function createMockBackend(initial: Project[] = [], options: MockOptions 
     },
 
     async projectCreate(name) {
-      const normalized = normalizeName(name);
-      seq += 1;
-      const ts = now();
-      const project: Project = {
-        id: `mock-project-${seq}`,
-        name: normalized,
-        source: null,
-        defaultEnvironmentId: null,
-        createdAt: ts,
-        updatedAt: ts,
-      };
-      projects.push(project);
-      ensureGlobal(project.id);
-      return { ...project };
+      return createProject(name);
     },
 
     async projectRename(id, name) {
@@ -308,7 +361,8 @@ export function createMockBackend(initial: Project[] = [], options: MockOptions 
     // ---- 送信 ----
 
     async requestSend(input) {
-      const a = assemble(input.request, lookupFor(input.projectId, input.environmentId));
+      const lookup = lookupFor(input.projectId, input.environmentId);
+      const a = assemble(effectiveSpec(input, lookup), lookup);
       const sendId = newId("mock-send");
       if (a.preview.unresolved.length > 0) {
         const names = a.preview.unresolved.map((u) => `{{${u.name}}}`).join("、");
@@ -348,7 +402,8 @@ export function createMockBackend(initial: Project[] = [], options: MockOptions 
     },
 
     async requestPreview(input) {
-      return assemble(input.request, lookupFor(input.projectId, input.environmentId)).preview;
+      const lookup = lookupFor(input.projectId, input.environmentId);
+      return assemble(effectiveSpec(input, lookup), lookup).preview;
     },
 
     async onRequestFinished(handler) {
@@ -368,6 +423,46 @@ export function createMockBackend(initial: Project[] = [], options: MockOptions 
 
     async pickFile() {
       return "/mock/files/sample.pdf";
+    },
+
+    async pickPaths(kind: PickKind) {
+      if (kind === "openapi-file") return ["/mock/openapi.yaml"];
+      if (kind === "folder") return ["/mock/api-docs"];
+      return ["/mock/api/openapi.yaml", "/mock/api/common.yaml"];
+    },
+
+    /** ブラウザでは、ページへのドロップのファイル名から `/mock/dropped/<名前>` を作って届ける（本物の絶対パスは取れない）。 */
+    async onFileDrop(handler) {
+      if (typeof window === "undefined") return () => {};
+      const over = (e: DragEvent) => {
+        e.preventDefault();
+        handler({ type: "over" });
+      };
+      const leave = () => handler({ type: "leave" });
+      const drop = (e: DragEvent) => {
+        e.preventDefault();
+        const dt = e.dataTransfer;
+        if (!dt) return;
+        const names = new Set<string>();
+        for (const item of Array.from(dt.items ?? [])) {
+          const entry = (item as DataTransferItem & { webkitGetAsEntry?: () => { name: string } | null }).webkitGetAsEntry?.();
+          if (entry) names.add(entry.name);
+        }
+        if (names.size === 0) for (const f of Array.from(dt.files)) names.add(f.name);
+        if (names.size > 0) handler({ type: "drop", paths: [...names].map((n) => `/mock/dropped/${n}`) });
+      };
+      window.addEventListener("dragover", over);
+      window.addEventListener("dragleave", leave);
+      window.addEventListener("drop", drop);
+      return () => {
+        window.removeEventListener("dragover", over);
+        window.removeEventListener("dragleave", leave);
+        window.removeEventListener("drop", drop);
+      };
+    },
+
+    async openExternal(url) {
+      if (typeof window !== "undefined" && /^https?:/.test(url)) window.open(url, "_blank", "noopener,noreferrer");
     },
 
     // ---- 環境 ----
@@ -499,5 +594,8 @@ export function createMockBackend(initial: Project[] = [], options: MockOptions 
       if (!adhocs.some((a) => a.id === id)) throw notFound("リクエスト", id);
       adhocs = adhocs.filter((a) => a.id !== id);
     },
+
+    ...openapi.methods,
   };
+  return Object.assign(backend, { mock: openapi.controls });
 }

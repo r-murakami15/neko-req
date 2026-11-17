@@ -28,7 +28,9 @@ nekoreq-curl = { path = "crates/curl" }
 
 # 共通
 serde = { version = "1", features = ["derive"] }
-serde_json = { version = "1", features = ["preserve_order"] }
+serde_json = { version = "1", features = ["preserve_order", "unbounded_depth"] }
+# 深く入れ子になった JSON を再帰で落ちずに読む（保存した Operation のスキーマ）
+serde_stacker = "0.1"
 thiserror = "2"
 uuid = { version = "1", features = ["v4", "serde"] }
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }

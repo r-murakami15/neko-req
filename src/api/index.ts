@@ -1,6 +1,7 @@
 import { isTauri } from "@tauri-apps/api/core";
 
 import { createMockBackend } from "../mock/backend";
+import type { MockControls } from "../mock/openapiBackend";
 import type { Backend } from "./backend";
 import { createTauriBackend } from "./tauri";
 
@@ -14,6 +15,15 @@ let backend: Backend | undefined;
  * メモリ上のモックに切り替える。
  */
 export function getDefaultBackend(): Backend {
-  backend ??= isTauri() ? createTauriBackend() : createMockBackend();
+  if (!backend) {
+    if (isTauri()) {
+      backend = createTauriBackend();
+    } else {
+      const mock = createMockBackend();
+      // ブラウザで確認するとき、コンソールから yaml の更新などを再現できるようにする
+      (window as unknown as { __nekoreqMock?: MockControls }).__nekoreqMock = mock.mock;
+      backend = mock;
+    }
+  }
   return backend;
 }

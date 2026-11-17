@@ -4,7 +4,8 @@
 //! 流れ:
 //! 1. `load`: 入口から `$ref` をたどって参照先のファイルをすべて読む（`load::crawl`）。位置つきの yaml パーサー
 //!    （saphyr）で `Value` と「JSON Pointer → 行番号」の表を作る（`pos`）。足りないファイル・壊れた yaml は一覧にして止める。
-//! 2. `convert`: paths を Operation にする（`schema::Inliner` が `$ref` を展開。循環は 2 回目で止める）。
+//! 2. `convert`: paths を Operation にする（`schema::Inliner` が `$ref` を展開。循環は 2 回目で止め、
+//!    1 Operation あたりの展開ノード数に上限を置く）。
 //! 3. `diff`: 前回の Operation と比べて追加・変更・削除を出す。
 //! 4. `view`: API ツリー・設計タブ・送信タブを開くときの初期状態を作る（`schema` がスキーマ表とモックを作る）。
 //!
@@ -69,7 +70,8 @@ pub async fn load(params: &LoadParams) -> LoadResult {
         load::Crawl::NeedsConfirmation(f) => LoadResult::NeedsConfirmation(f),
         load::Crawl::Blocked(p) => LoadResult::Blocked(p),
         load::Crawl::Done(docs) => {
-            let converted = convert::convert(&docs);
+            // 深い入れ子でスタックが足りなくならないように、大きなスタックで変換する
+            let converted = pos::on_big_stack(|| convert::convert(&docs));
             let files: Vec<SourceFile> = docs
                 .files
                 .iter()

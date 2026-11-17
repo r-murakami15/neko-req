@@ -416,7 +416,8 @@ pub fn initial_body(rb: &RequestBodySpec, fill: bool) -> (Body, Option<String>) 
     (body, Some(ct))
 }
 
-/// yaml のパラメータから作る初期の行（すべて無効の状態）。
+/// yaml のパラメータから作る初期の行。path パラメータは OpenAPI で常に必須なので有効、
+/// それ以外（query・header・cookie）は無効の状態で並べる（設計書の対応表）。
 pub fn initial_params(op: &Operation, fill: bool) -> Vec<KeyValue> {
     op.parameters
         .iter()
@@ -432,7 +433,7 @@ pub fn initial_params(op: &Operation, fill: bool) -> Vec<KeyValue> {
             } else {
                 String::new()
             },
-            enabled: false,
+            enabled: p.location == ParamIn::Path,
         })
         .collect()
 }

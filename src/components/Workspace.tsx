@@ -33,7 +33,7 @@ export function Workspace({ project }: { project: Project }) {
       ) : (
         <div className="empty-workspace">
           <p>リクエストを開いていません。</p>
-          <p className="muted-note">新しいリクエストを作るか、サイドバーの「その他」から開いてください。</p>
+          <p className="muted-note">新しいリクエストを作るか、サイドバーの API ツリー（OpenAPI の API・「その他」）から開いてください。</p>
           <button type="button" className="btn btn-primary" onClick={() => setNewRequestDialogOpen(true)}>
             新しいリクエスト
           </button>

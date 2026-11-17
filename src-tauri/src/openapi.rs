@@ -10,7 +10,9 @@
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
-use nekoreq_core::{ApiSource, ImportOptions, OpKey, Operation, Project, SourceFile, SourceKind};
+use nekoreq_core::{
+    match_operations, ApiSource, ImportOptions, OpKey, Operation, Project, SourceFile, SourceKind,
+};
 use nekoreq_openapi::{
     build_preview, diff_operations, load, upload, ForeignRef, ImportPreview, LoadEntry, LoadParams,
     LoadProblem, LoadResult, Loaded, OperationDetail, OperationListItem, OperationOpen, ParamRef,
@@ -25,7 +27,7 @@ use crate::error::AppError;
 use crate::state::AppState;
 
 /// 取り込み元の指定。
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase", tag = "kind")]
 pub enum SourceInput {
     /// ローカルのファイル（入口の yaml）。フォルダを指定すると、中の `openapi:` を持つファイルを探す。
@@ -53,6 +55,42 @@ pub enum SourceInput {
         #[serde(default)]
         allowed_hosts: Vec<String>,
     },
+}
+
+/// トークンは値を出さない（ログ・panic に平文で出ないように）。
+impl std::fmt::Debug for SourceInput {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SourceInput::Path {
+                path,
+                allowed_hosts,
+            } => f
+                .debug_struct("Path")
+                .field("path", path)
+                .field("allowed_hosts", allowed_hosts)
+                .finish(),
+            SourceInput::Url {
+                url,
+                token,
+                allowed_hosts,
+            } => f
+                .debug_struct("Url")
+                .field("url", url)
+                .field("token", &token.as_ref().map(|_| "***"))
+                .field("allowed_hosts", allowed_hosts)
+                .finish(),
+            SourceInput::Upload {
+                paths,
+                entry,
+                allowed_hosts,
+            } => f
+                .debug_struct("Upload")
+                .field("paths", paths)
+                .field("entry", entry)
+                .field("allowed_hosts", allowed_hosts)
+                .finish(),
+        }
+    }
 }
 
 /// コピー方式の同期でもう一度選んでもらうファイル。
@@ -202,6 +240,16 @@ struct ImportPlan {
     options: ImportOptions,
     /// servers から環境を作る（取り込みのときだけ。同期では作らない）。
     create_environments: bool,
+}
+
+/// 差分に出す「新しく取り込まれる API」の範囲。
+enum DiffScope<'a> {
+    /// 確認画面。取り込んでいない API も、選べるので「追加」に出す。
+    All,
+    /// 同期。まだ保存にない API だけが「追加」（取り込んでいない API は出さない）。
+    Sync,
+    /// 既存プロジェクトへの取り込み。選んだ API だけが「追加」。
+    Only(&'a HashSet<OpKey>),
 }
 
 /// 読み込めなかった理由（画面にそのまま返す）。
@@ -358,12 +406,20 @@ impl AppState {
                         entry: LoadEntry::Path(entry.clone()),
                         token: None,
                         allowed_hosts: hosts.clone(),
+                        root: None,
                     },
                     Origin::Path { entry },
                 )
             }
             SourceInput::Url { url, token, .. } => {
-                let input_token = token.clone().filter(|t| !t.is_empty());
+                // `user:pass@` は保存しない（トークンはトークン欄で）。クエリはそのまま使う
+                nekoreq_openapi::load::check_entry_url(url).map_err(AppError::Validation)?;
+                // 貼り付けで付いた前後の空白・改行は除く
+                let input_token = token
+                    .as_deref()
+                    .map(str::trim)
+                    .filter(|t| !t.is_empty())
+                    .map(str::to_string);
                 // 入力のトークンがなければ、保存済みのもの（同期のとき）
                 let used = match (&input_token, existing) {
                     (Some(t), _) => Some(t.clone()),
@@ -377,6 +433,7 @@ impl AppState {
                         entry: LoadEntry::Url(url.trim().to_string()),
                         token: used,
                         allowed_hosts: hosts.clone(),
+                        root: None,
                     },
                     Origin::Url {
                         entry: url.trim().to_string(),
@@ -418,6 +475,8 @@ impl AppState {
                         entry: LoadEntry::Path(tmp.path().join(&entry_rel)),
                         token: None,
                         allowed_hosts: hosts.clone(),
+                        // 置いたコピーの外（絶対パス・../・file://）のファイルは読ませない
+                        root: Some(tmp.path().to_path_buf()),
                     },
                     Origin::Upload {
                         staged: tmp,
@@ -437,18 +496,44 @@ impl AppState {
         }
     }
 
-    /// 前回（保存済み・消えたものを除く）の Operation と、入力値を持つキー。
-    fn current_operations(
+    /// 保存済みの Operation と今回の Operation の差分。ツリーに出ている（取り込み済み・消えていない）API だけが
+    /// 比べる対象。取り込んでいない API の変更・削除は出さず、`scope` に応じて新しく取り込まれるものだけを「追加」にする。
+    fn diff_against_stored(
         &self,
         project_id: &str,
-    ) -> Result<(Vec<Operation>, HashSet<OpKey>), AppError> {
+        new: &[Operation],
+        scope: DiffScope<'_>,
+    ) -> Result<SyncDiff, AppError> {
         let stored = self.db().operations_list(project_id)?;
-        let ops = stored
+        let drafts = self.db().draft_keys(project_id)?;
+        let all_old: Vec<Operation> = stored.iter().map(|s| s.operation.clone()).collect();
+        let m = match_operations(&all_old, new);
+        let wanted = |key: &OpKey| match &scope {
+            DiffScope::All | DiffScope::Sync => true,
+            DiffScope::Only(set) => set.contains(key),
+        };
+        let mut keep = vec![false; new.len()];
+        for &(i, j) in &m.pairs {
+            // すでに取り込んでいるものは比べる。取り込んでいないものは、選ばれたときだけ（追加になる）
+            keep[j] = stored[i].imported
+                || matches!(scope, DiffScope::All)
+                || matches!(&scope, DiffScope::Only(set) if set.contains(&new[j].op_key));
+        }
+        for &j in &m.added {
+            keep[j] = wanted(&new[j].op_key);
+        }
+        let filtered: Vec<Operation> = new
+            .iter()
+            .zip(&keep)
+            .filter(|(_, k)| **k)
+            .map(|(o, _)| o.clone())
+            .collect();
+        let old: Vec<Operation> = stored
             .into_iter()
-            .filter(|s| s.deleted_at.is_none())
+            .filter(|s| s.imported && s.deleted_at.is_none())
             .map(|s| s.operation)
             .collect();
-        Ok((ops, self.db().draft_keys(project_id)?))
+        Ok(diff_operations(&old, &filtered, &drafts))
     }
 
     // ---- 確認 ----
@@ -475,8 +560,7 @@ impl AppState {
         };
         let diff = match &existing {
             Some(p) => {
-                let (old, drafts) = self.current_operations(&p.id)?;
-                Some(diff_operations(&old, &ready.loaded.operations, &drafts))
+                Some(self.diff_against_stored(&p.id, &ready.loaded.operations, DiffScope::All)?)
             }
             None => None,
         };
@@ -530,8 +614,11 @@ impl AppState {
 
         let diff = match &existing {
             Some(p) => {
-                let (old, drafts) = self.current_operations(&p.id)?;
-                Some(diff_operations(&old, &loaded.operations, &drafts))
+                let scope = match &selection {
+                    Selection::Only(set) => DiffScope::Only(set),
+                    Selection::AllNew => DiffScope::Sync,
+                };
+                Some(self.diff_against_stored(&p.id, &loaded.operations, scope)?)
             }
             None => None,
         };
@@ -725,8 +812,8 @@ impl AppState {
             }
             Err(Gate::Blocked(problems)) => return Ok(SyncCheckResult::Blocked { problems }),
         };
-        let (old, drafts) = self.current_operations(project_id)?;
-        let diff = diff_operations(&old, &ready.loaded.operations, &drafts);
+        let diff =
+            self.diff_against_stored(project_id, &ready.loaded.operations, DiffScope::Sync)?;
         let before: &[SourceFile] = project
             .source
             .as_ref()
@@ -773,8 +860,7 @@ impl AppState {
             origin,
             allowed_hosts,
         } = ready;
-        let (old, drafts) = self.current_operations(project_id)?;
-        let diff = diff_operations(&old, &loaded.operations, &drafts);
+        let diff = self.diff_against_stored(project_id, &loaded.operations, DiffScope::Sync)?;
         let options = project
             .source
             .as_ref()

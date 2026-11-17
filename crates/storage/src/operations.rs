@@ -77,6 +77,16 @@ fn kind_str(k: SourceKind) -> &'static str {
     }
 }
 
+/// 保存した JSON を読み戻す。スキーマの入れ子が深くても読めるように、再帰の上限を外し、スタックは足りなければ
+/// 伸ばす（保存できたものは必ず読み戻せる）。
+fn from_json<T: serde::de::DeserializeOwned>(s: &str) -> serde_json::Result<T> {
+    let mut de = serde_json::Deserializer::from_str(s);
+    de.disable_recursion_limit();
+    let v = T::deserialize(serde_stacker::Deserializer::new(&mut de))?;
+    de.end()?;
+    Ok(v)
+}
+
 fn to_json<T: Serialize>(v: &T, what: &str) -> Result<String> {
     serde_json::to_string(v).map_err(|e| corrupt(what, e))
 }
@@ -107,13 +117,13 @@ fn stored_from_row(row: &Row<'_>) -> Result<StoredOperation> {
             tags: serde_json::from_str(&tags_json).map_err(|e| corrupt("tags_json", e))?,
             summary: row.get(7)?,
             description: row.get(8)?,
-            parameters: serde_json::from_str::<Vec<ParamSpec>>(&parameters_json)
+            parameters: from_json::<Vec<ParamSpec>>(&parameters_json)
                 .map_err(|e| corrupt("parameters_json", e))?,
             request_body: request_body_json
-                .map(|j| serde_json::from_str::<RequestBodySpec>(&j))
+                .map(|j| from_json::<RequestBodySpec>(&j))
                 .transpose()
                 .map_err(|e| corrupt("request_body_json", e))?,
-            responses: serde_json::from_str::<Vec<ResponseSpec>>(&responses_json)
+            responses: from_json::<Vec<ResponseSpec>>(&responses_json)
                 .map_err(|e| corrupt("responses_json", e))?,
             security: security_json
                 .map(|j| serde_json::from_str::<Vec<SecurityRequirement>>(&j))
@@ -483,10 +493,8 @@ impl Database {
         for &(i, j) in &m.pairs {
             let (o, n) = (&old[i], &new_ops[j]);
             let renamed = o.operation.op_key != n.op_key;
-            let changed = renamed
-                || o.deleted_at.is_some()
-                || o.operation.content_hash != n.content_hash
-                || o.operation.tags != n.tags;
+            let changed =
+                renamed || o.operation.content_hash != n.content_hash || o.operation.tags != n.tags;
             // 既存の取り込み済みはそのまま。選ばれていた（Only）ものは取り込み済みにする
             let imported = match selection {
                 Selection::Only(s) if s.contains(&n.op_key) => Some(true),
@@ -505,7 +513,10 @@ impl Database {
             }
             write_operation(&tx, &o.operation.id, project_id, n, imported, false)?;
             update_stale(&tx, project_id, &n.op_key, &o.operation, n)?;
-            if changed {
+            // yaml に戻ってきた API（削除済みだったもの）は、同期の差分と同じく「追加」と数える
+            if o.deleted_at.is_some() {
+                report.added += 1;
+            } else if changed {
                 report.changed += 1;
             }
         }

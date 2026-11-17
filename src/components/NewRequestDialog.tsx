@@ -9,6 +9,7 @@ export function NewRequestDialog({ projectId }: { projectId: string }) {
   const open = useUiStore((s) => s.newRequestDialogOpen);
   const setOpen = useUiStore((s) => s.setNewRequestDialogOpen);
   const setCreateDialogOpen = useUiStore((s) => s.setCreateDialogOpen);
+  const setImportDialogOpen = useUiStore((s) => s.setImportDialogOpen);
   const openNew = useTabsStore((s) => s.openNew);
 
   return (
@@ -51,10 +52,15 @@ export function NewRequestDialog({ projectId }: { projectId: string }) {
           <span className="card-title">プロジェクト</span>
           <span className="card-sub">新しいプロジェクトを作る</span>
         </button>
-        <button type="button" className="card" disabled title="OpenAPI の取り込みは M3 で実装">
-          <span className="card-title">
-            OpenAPI から<span className="pending-badge">M3 で実装</span>
-          </span>
+        <button
+          type="button"
+          className="card"
+          onClick={() => {
+            setOpen(false);
+            setImportDialogOpen(true);
+          }}
+        >
+          <span className="card-title">OpenAPI から</span>
           <span className="card-sub">YAML / JSON を取り込む</span>
         </button>
       </div>

@@ -8,6 +8,7 @@ import "./styles/fonts.css";
 import "./styles/theme.css";
 import "./styles/app.css";
 import "./styles/request.css";
+import "./styles/openapi.css";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } },

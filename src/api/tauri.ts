@@ -1,4 +1,6 @@
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { open, save } from "@tauri-apps/plugin-dialog";
+import { openUrl } from "@tauri-apps/plugin-opener";
 
 import { commands, events } from "../bindings";
 import { type Backend, unwrap } from "./backend";
@@ -49,5 +51,42 @@ export function createTauriBackend(): Backend {
     adhocDelete: async (id) => {
       await unwrap(commands.adhocDelete(id));
     },
+
+    openapiPreview: (source, projectId) => unwrap(commands.openapiPreview(source, projectId)),
+    openapiImport: (request) => unwrap(commands.openapiImport(request)),
+    openapiSyncCheck: (projectId, upload) => unwrap(commands.openapiSyncCheck(projectId, upload)),
+    openapiSyncApply: (projectId, upload) => unwrap(commands.openapiSyncApply(projectId, upload)),
+    openapiSourceChanged: (projectId) => unwrap(commands.openapiSourceChanged(projectId)),
+    operationList: (projectId) => unwrap(commands.operationList(projectId)),
+    operationGet: (projectId, opKey) => unwrap(commands.operationGet(projectId, opKey)),
+    operationOpen: (projectId, opKey) => unwrap(commands.operationOpen(projectId, opKey)),
+    operationForget: async (projectId, opKey) => {
+      await unwrap(commands.operationForget(projectId, opKey));
+    },
+    sourceTokenSet: (projectId, token) => unwrap(commands.sourceTokenSet(projectId, token)),
+    editorOpen: async (projectId, file, line) => {
+      await unwrap(commands.editorOpen(projectId, file, line));
+    },
+    draftSave: (draft) => unwrap(commands.draftSave(draft)),
+    draftGet: (projectId, opKey) => unwrap(commands.draftGet(projectId, opKey)),
+
+    pickPaths: async (kind) => {
+      const picked =
+        kind === "folder"
+          ? await open({ multiple: false, directory: true })
+          : kind === "openapi-file"
+            ? await open({ multiple: false, directory: false, filters: [{ name: "OpenAPI（yaml / json）", extensions: ["yaml", "yml", "json"] }] })
+            : await open({ multiple: true, directory: false, filters: [{ name: "OpenAPI・zip", extensions: ["yaml", "yml", "json", "zip"] }] });
+      if (picked === null) return [];
+      return Array.isArray(picked) ? picked : [picked];
+    },
+    onFileDrop: (handler) =>
+      getCurrentWebview().onDragDropEvent((e) => {
+        const p = e.payload;
+        if (p.type === "drop") handler({ type: "drop", paths: p.paths });
+        else if (p.type === "leave") handler({ type: "leave" });
+        else handler({ type: "over" });
+      }),
+    openExternal: (url) => openUrl(url),
   };
 }

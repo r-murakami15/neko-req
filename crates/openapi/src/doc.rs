@@ -163,9 +163,20 @@ pub struct FileDoc {
     pub modified_at: Option<String>,
     pub hash: String,
     pub bytes: usize,
+    /// URL で読んだとき、リダイレクトのあとの実際の URL。相対 `$ref` はこれを基準に解決する
+    /// （RFC 3986 の基準 URI）。リダイレクトがなければ `loc` と同じ。
+    pub base_url: Option<Url>,
 }
 
 impl FileDoc {
+    /// このファイルに書かれた `$ref` のファイル部分を解決する。
+    pub fn join(&self, file_part: &str) -> Result<Loc, String> {
+        match (&self.loc, &self.base_url) {
+            (Loc::Url(_), Some(base)) => Loc::Url(base.clone()).join(file_part),
+            _ => self.loc.join(file_part),
+        }
+    }
+
     /// ポインターの行番号（なければポインターを遡って近い行）。
     pub fn line_of(&self, ptr: &str) -> Option<u32> {
         let mut p = ptr;
@@ -247,10 +258,7 @@ impl DocSet {
         let target_file = if file_part.is_empty() {
             from
         } else {
-            let loc = self.files[from]
-                .loc
-                .join(file_part)
-                .map_err(RefFail::Invalid)?;
+            let loc = self.files[from].join(file_part).map_err(RefFail::Invalid)?;
             self.find(&loc)
                 .ok_or_else(|| RefFail::MissingFile(file_part.to_string()))?
         };

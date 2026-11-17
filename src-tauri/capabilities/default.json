@@ -1,12 +1,14 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "メインウィンドウに許す権限。自作のコマンド（project_* / request_* など）は権限なしで呼べるので、ここには送信結果のイベント（request://finished）の購読と、レスポンスのボディの保存先を選ぶ保存ダイアログと、ボディ・multipart で送るファイルを選ぶダイアログだけを置く",
+  "description": "メインウィンドウに許す権限。自作のコマンド（project_* / request_* / openapi_* など）は権限なしで呼べるので、ここには送信結果のイベント（request://finished）とファイルのドロップの購読と、レスポンスのボディの保存先を選ぶ保存ダイアログと、ボディ・multipart で送るファイルや OpenAPI の取り込み元（ファイル・フォルダ）を選ぶダイアログと、設計タブの説明（Markdown）にあるリンクを既定のブラウザで開く権限（http / https / mailto / tel の URL だけ）を置く",
   "windows": ["main"],
   "permissions": [
     "core:event:allow-listen",
     "core:event:allow-unlisten",
     "dialog:allow-save",
-    "dialog:allow-open"
+    "dialog:allow-open",
+    "opener:allow-open-url",
+    "opener:allow-default-urls"
   ]
 }

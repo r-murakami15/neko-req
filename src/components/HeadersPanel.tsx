@@ -1,7 +1,7 @@
 import { useState } from "react";
 
-import type { AutoHeader, RequestSpec } from "../bindings";
-import { replaceRows, rowsOf } from "../lib/spec";
+import type { AutoHeader, KeyValue, RequestSpec } from "../bindings";
+import { type ParamMeta, replaceRows, rowInfoFor, rowsOf } from "../lib/spec";
 import type { UnresolvedIndex } from "../lib/vars";
 import { KeyValueTable } from "./KeyValueTable";
 
@@ -10,10 +10,12 @@ interface Props {
   onChange: (update: (spec: RequestSpec) => RequestSpec) => void;
   unresolved: UnresolvedIndex;
   autoHeaders: AutoHeader[];
+  /** yaml の API のとき: 説明・必須・「yaml にない」の表示（表示専用）。 */
+  meta?: ParamMeta;
 }
 
 /** ヘッダーのタブ。手入力の表と、アプリが自動で付けるヘッダー。 */
-export function HeadersPanel({ spec, onChange, unresolved, autoHeaders }: Props) {
+export function HeadersPanel({ spec, onChange, unresolved, autoHeaders, meta }: Props) {
   const [showAuto, setShowAuto] = useState(true);
 
   return (
@@ -26,6 +28,7 @@ export function HeadersPanel({ spec, onChange, unresolved, autoHeaders }: Props)
           items={rowsOf(spec.params, "header")}
           onChange={(next) => onChange((s) => ({ ...s, params: replaceRows(s.params, "header", next) }))}
           unresolved={(row, part) => unresolved.param("header", row, part)}
+          info={meta ? (item: KeyValue) => rowInfoFor(meta, item) : undefined}
         />
       </section>
 

@@ -32,7 +32,7 @@ use reqwest::header::{HeaderName, HeaderValue, ACCEPT_ENCODING, CONTENT_TYPE};
 
 use crate::timing::{compute, Recorder, TimingLayer, TimingResolver};
 
-pub use fetch::{fetch_bytes, FetchError};
+pub use fetch::{fetch_bytes, fetch_bytes_at, FetchError};
 
 /// 送信を止めるための合図（`cancel()` で止まる）。
 pub use tokio_util::sync::CancellationToken;

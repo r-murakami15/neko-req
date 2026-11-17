@@ -1,6 +1,7 @@
 import { create } from "zustand";
 
-import type { AdHocRequest, AuthOverride, Body, RequestSpec, SendOutcome } from "../bindings";
+import type { AdHocRequest, AuthOverride, Body, DefaultAuth, OpKey, OperationOpen, ParamRef, RequestDraft, RequestSpec, SendOutcome } from "../bindings";
+import { opKeyString } from "../lib/opkey";
 import { emptySpec, NEW_REQUEST_NAME, specOfAdhoc } from "../lib/spec";
 
 export type RequestPane = "params" | "headers" | "body" | "auth" | "design";
@@ -21,12 +22,31 @@ export interface SendState {
 
 export const IDLE_SEND: SendState = { phase: "idle", sendId: null, cancelRequested: false, outcome: null, envName: null };
 
+/** yaml の API（OpenAPI の Operation）として開いたタブの、yaml 側の情報。 */
+export interface OpTabInfo {
+  opKey: OpKey;
+  method: string;
+  path: string;
+  summary: string | null;
+  /** yaml から消えたパラメータ（「yaml にない」と表示して、送信から外す）。 */
+  missingInYaml: ParamRef[];
+  /** yaml の必須パラメータ（空なら警告）。 */
+  requiredParams: ParamRef[];
+  /** yaml の security から決まる既定の認証（表示用）。 */
+  defaultAuth: DefaultAuth | null;
+  /** yaml から消えた API（「削除された API」）。 */
+  deleted: boolean;
+  bodyContentType: string | null;
+}
+
 /** 開いているリクエストのタブ。入力は保存するまでここに持つ。 */
 export interface RequestTab {
   id: string;
   projectId: string;
   /** 保存済みの AdHocRequest の ID。新しいリクエストは `null`。 */
   adhocId: string | null;
+  /** yaml の API のタブなら、その情報（保存は RequestDraft として、ダイアログなしで行う）。 */
+  op: OpTabInfo | null;
   name: string;
   /** 保存済みの説明（「説明（任意）」）。上書き保存のときに引き継ぐ。 */
   description: string;
@@ -58,16 +78,42 @@ function stable(value: unknown): string {
 
 export const serializeTab = (name: string, spec: RequestSpec) => stable([name, spec]);
 
+/** 開いたとき（`operation_open`）の戻り値から、タブの yaml 側の情報を作る。 */
+export function opInfoOf(opened: OperationOpen): OpTabInfo {
+  return {
+    opKey: opened.opKey,
+    method: opened.method,
+    path: opened.path,
+    summary: opened.summary,
+    missingInYaml: opened.missingInYaml,
+    requiredParams: opened.requiredParams,
+    defaultAuth: opened.defaultAuth,
+    deleted: opened.deleted,
+    bodyContentType: opened.bodyContentType,
+  };
+}
+
+/** yaml の API のタブの表示名。 */
+export const opTabName = (opened: OperationOpen) => opened.summary ?? `${opened.method} ${opened.path}`;
+
 export const isDirty = (tab: RequestTab) => serializeTab(tab.name, tab.spec) !== tab.baseline;
 
 let counter = 0;
 const nextTabId = () => `tab-${(counter += 1)}`;
 
-function makeTab(projectId: string, name: string, spec: RequestSpec, adhocId: string | null, description = ""): RequestTab {
+function makeTab(
+  projectId: string,
+  name: string,
+  spec: RequestSpec,
+  adhocId: string | null,
+  description = "",
+  op: OpTabInfo | null = null,
+): RequestTab {
   return {
     id: nextTabId(),
     projectId,
     adhocId,
+    op,
     name,
     description,
     spec,
@@ -94,6 +140,13 @@ interface TabsState {
 
   openNew: (projectId: string) => string;
   openAdhoc: (adhoc: AdHocRequest) => string;
+  /** yaml の API を開く。同じ API のタブが開いていれば、そのタブを前に出す。 */
+  openOp: (projectId: string, opened: OperationOpen) => string;
+  /** 開いている API のタブを探す。 */
+  findOpTab: (projectId: string, opKey: OpKey) => RequestTab | undefined;
+  /** 同期のあとなどに、タブの yaml 側の情報だけを更新する（入力した内容は変えない）。 */
+  setOpInfo: (tabId: string, op: OpTabInfo) => void;
+  markDraftSaved: (tabId: string, saved: RequestDraft, base: { name: string; spec: RequestSpec }) => void;
   activate: (projectId: string, tabId: string) => void;
   close: (tabId: string) => void;
   patch: (tabId: string, patch: TabPatch) => void;
@@ -130,6 +183,33 @@ export const useTabsStore = create<TabsState>()((set, get) => ({
     set((s) => ({ tabs: [...s.tabs, tab], activeByProject: { ...s.activeByProject, [adhoc.projectId]: tab.id } }));
     return tab.id;
   },
+
+  openOp: (projectId, opened) => {
+    const existing = get().tabs.find((t) => t.projectId === projectId && t.op && opKeyString(t.op.opKey) === opKeyString(opened.opKey));
+    if (existing) {
+      set((s) => ({ activeByProject: { ...s.activeByProject, [projectId]: existing.id } }));
+      return existing.id;
+    }
+    const tab = makeTab(projectId, opTabName(opened), opened.request, null, "", opInfoOf(opened));
+    set((s) => ({ tabs: [...s.tabs, tab], activeByProject: { ...s.activeByProject, [projectId]: tab.id } }));
+    return tab.id;
+  },
+
+  findOpTab: (projectId, opKey) =>
+    get().tabs.find((t) => t.projectId === projectId && t.op && opKeyString(t.op.opKey) === opKeyString(opKey)),
+
+  setOpInfo: (tabId, op) => set((s) => ({ tabs: mapTab(s.tabs, tabId, (t) => ({ ...t, op })) })),
+
+  // 保存している間にも入力は続けられるので、タブの内容はそのままにして「保存した時点の内容」だけ更新する
+  markDraftSaved: (tabId, saved, base) =>
+    set((s) => ({
+      tabs: mapTab(s.tabs, tabId, (t) => ({
+        ...t,
+        baseline: serializeTab(base.name, { ...base.spec, params: saved.params, body: saved.body, auth: saved.auth }),
+        // 保存すると、画面で消した「yaml にない」パラメータの印も外れる
+        op: t.op ? { ...t.op, missingInYaml: t.op.missingInYaml.filter((m) => saved.params.some((p) => p.location === m.location && p.name === m.name)) } : t.op,
+      })),
+    })),
 
   activate: (projectId, tabId) => set((s) => ({ activeByProject: { ...s.activeByProject, [projectId]: tabId } })),
 

@@ -3,13 +3,32 @@ import type {
   AppError,
   AppInfo,
   Environment,
+  ImportRequest,
+  ImportResult,
+  OpKey,
+  OperationDetail,
+  OperationListItem,
+  OperationOpen,
+  PreviewResult,
   Project,
+  RequestDraft,
   RequestFinished,
   RequestInput,
   RequestPreview,
   Result,
   SendSettings,
+  SourceChanged,
+  SourceInput,
+  SyncApplyResult,
+  SyncCheckResult,
+  UploadInput,
 } from "../bindings";
+
+/** ウィンドウへのファイルのドラッグ＆ドロップ。`drop` のときだけ絶対パスが届く。 */
+export type FileDropEvent = { type: "over" } | { type: "leave" } | { type: "drop"; paths: string[] };
+
+/** 取り込みダイアログで選ぶものの種類。 */
+export type PickKind = "openapi-file" | "folder" | "files";
 
 /**
  * 画面が Rust（または Tauri の外ではモック）を呼ぶための窓口。
@@ -48,6 +67,29 @@ export interface Backend {
   adhocList(projectId: string): Promise<AdHocRequest[]>;
   adhocSave(request: AdHocRequest): Promise<AdHocRequest>;
   adhocDelete(id: string): Promise<void>;
+
+  // ---- OpenAPI の取り込みと同期（M3・M4） ----
+  openapiPreview(source: SourceInput, projectId: string | null): Promise<PreviewResult>;
+  openapiImport(request: ImportRequest): Promise<ImportResult>;
+  openapiSyncCheck(projectId: string, upload: UploadInput | null): Promise<SyncCheckResult>;
+  openapiSyncApply(projectId: string, upload: UploadInput | null): Promise<SyncApplyResult>;
+  /** パス方式: 全ファイルの更新日時だけを見る（読み直さない）。 */
+  openapiSourceChanged(projectId: string): Promise<SourceChanged>;
+  operationList(projectId: string): Promise<OperationListItem[]>;
+  operationGet(projectId: string, opKey: OpKey): Promise<OperationDetail>;
+  operationOpen(projectId: string, opKey: OpKey): Promise<OperationOpen>;
+  operationForget(projectId: string, opKey: OpKey): Promise<void>;
+  sourceTokenSet(projectId: string, token: string): Promise<Project>;
+  editorOpen(projectId: string, file: string, line: number | null): Promise<void>;
+  draftSave(draft: RequestDraft): Promise<RequestDraft>;
+  draftGet(projectId: string, opKey: OpKey): Promise<RequestDraft | null>;
+
+  /** 取り込み元を選ぶダイアログ。選ばなければ空の配列。 */
+  pickPaths(kind: PickKind): Promise<string[]>;
+  /** ウィンドウへのドロップの購読。解除する関数を返す。 */
+  onFileDrop(handler: (event: FileDropEvent) => void): Promise<() => void>;
+  /** http(s) の URL を OS の既定のブラウザで開く。 */
+  openExternal(url: string): Promise<void>;
 }
 
 /** Rust 側が返した `AppError`（`{ kind, message }`）を包んだ例外。`message` は日本語でそのまま表示できる。 */

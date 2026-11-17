@@ -293,7 +293,7 @@ describe("リクエストの入力", () => {
     expect(await screen.findByDisplayValue("/mock/files/sample.pdf")).toBeInTheDocument();
 
     await user.click(screen.getByRole("tab", { name: "認証" }));
-    // v1 にない方式は出さず、プロジェクトの既定は M3 まで選べない
+    // v1 にない方式は出さず、プロジェクトの既定は OpenAPI の API のタブだけで選べる
     expect(screen.queryByText("OAuth 2.0")).not.toBeInTheDocument();
     expect(screen.queryByText("Digest 認証")).not.toBeInTheDocument();
     expect(screen.getByRole("radio", { name: /プロジェクトの既定を使う/ })).toBeDisabled();
@@ -307,11 +307,11 @@ describe("リクエストの入力", () => {
     expect(screen.queryByText(/abc/, { selector: ".code-box *" })).not.toBeInTheDocument(); // 値は伏せ字
   });
 
-  it("設計タブは M4 で実装と分かる", async () => {
+  it("OpenAPI の API ではないタブの設計は、設計がないと分かる", async () => {
     const { user } = await setup();
     await openNewRequest(user);
     await user.click(screen.getByRole("tab", { name: "設計" }));
-    expect(screen.getByText(/M4 で実装/)).toBeInTheDocument();
+    expect(screen.getByText(/OpenAPI の API ではないので、設計はありません/)).toBeInTheDocument();
   });
 });
 

@@ -35,6 +35,7 @@ fn params(url: String, token: Option<&str>, allowed: Vec<String>) -> LoadParams 
         entry: LoadEntry::Url(url),
         token: token.map(String::from),
         allowed_hosts: allowed,
+        root: None,
     }
 }
 
@@ -154,7 +155,7 @@ async fn references_to_another_host_wait_for_confirmation_and_get_no_token() {
         panic!("確認待ちのはず")
     };
     assert_eq!(foreign.len(), 1);
-    let host = other.uri().trim_start_matches("http://").to_string();
+    let host = other.uri();
     assert_eq!(foreign[0].host, host);
     assert_eq!(foreign[0].referenced_from.file, "openapi.yaml");
     assert_eq!(foreign[0].referenced_from.line, Some(5));
@@ -191,4 +192,107 @@ async fn a_local_entry_referencing_a_url_also_needs_confirmation() {
     let r = common::load_path(&f).await;
     assert!(matches!(r, LoadResult::NeedsConfirmation(_)));
     assert!(other.received_requests().await.unwrap().is_empty());
+}
+
+const ENTRY_HEAD: &str = "openapi: 3.0.3\ninfo: {title: R, version: '1'}\n";
+const GET_A: &str = "get:\n  operationId: getA\n  responses:\n    '200': {description: ok}\n";
+
+#[tokio::test]
+async fn relative_refs_after_a_redirect_resolve_against_the_final_url() {
+    // 決定: 入口が 30x で別ホストへ飛ぶのは許可（GitHub raw など）。相対 $ref は実際に取得した URL が基準。
+    // トークンは付けない。リダイレクト先の origin の参照は確認なしで読む
+    let main = MockServer::start().await;
+    let other = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/blob/openapi.yaml"))
+        .respond_with(
+            ResponseTemplate::new(302)
+                .insert_header("location", format!("{}/raw/v1/openapi.yaml", other.uri())),
+        )
+        .mount(&main)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/raw/v1/openapi.yaml"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(format!(
+            "{ENTRY_HEAD}paths:\n  /a:\n    $ref: './parts/a.yaml'\n"
+        )))
+        .mount(&other)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/raw/v1/parts/a.yaml"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(GET_A))
+        .mount(&other)
+        .await;
+    let r = load(&params(
+        format!("{}/blob/openapi.yaml", main.uri()),
+        Some("tok"),
+        vec![],
+    ))
+    .await;
+    let LoadResult::Loaded(l) = r else {
+        panic!("リダイレクト先を基準に読めるはず")
+    };
+    assert_eq!(l.operations.len(), 1);
+    // 元の入口のホストには相対参照を取りに行かない。トークンは入口にだけ
+    let m = main.received_requests().await.unwrap();
+    assert_eq!(m.len(), 1);
+    assert!(m[0].headers.get("authorization").is_some());
+    let o = other.received_requests().await.unwrap();
+    assert_eq!(o.len(), 2);
+    assert!(o.iter().all(|r| r.headers.get("authorization").is_none()));
+}
+
+#[tokio::test]
+async fn confirmed_hosts_are_scheme_host_and_port_origins() {
+    let main = MockServer::start().await;
+    let other = MockServer::start().await;
+    let other_host = other.uri().trim_start_matches("http://").to_string();
+    Mock::given(method("GET"))
+        .and(path("/api/openapi.yaml"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(format!(
+            "{ENTRY_HEAD}paths:\n  /a:\n    $ref: '{}/x.yaml'\n",
+            other.uri()
+        )))
+        .mount(&main)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/x.yaml"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(GET_A))
+        .mount(&other)
+        .await;
+    let url = format!("{}/api/openapi.yaml", main.uri());
+    // http の参照は、https で確認した（スキームのない古い表記を含む）ホストでは通らない
+    for allowed in [
+        format!("https://{other_host}"),
+        other_host.clone(),
+        // ポートだけ違う
+        "http://127.0.0.1:1".to_string(),
+    ] {
+        let r = load(&params(url.clone(), None, vec![allowed.clone()])).await;
+        let LoadResult::NeedsConfirmation(f) = r else {
+            panic!("{allowed} では確認が要るはず")
+        };
+        assert_eq!(f[0].host, other.uri());
+    }
+    assert!(other.received_requests().await.unwrap().is_empty());
+    // 同じ origin なら大文字小文字を区別せず通る
+    let r = load(&params(url, None, vec![other.uri().to_uppercase()])).await;
+    assert!(matches!(r, LoadResult::Loaded(_)));
+}
+
+#[tokio::test]
+async fn userinfo_in_the_entry_url_is_refused_with_a_hint_and_no_request() {
+    let main = MockServer::start().await;
+    let host = main.uri().trim_start_matches("http://").to_string();
+    let r = load(&params(format!("http://u:PW@{host}/x.yaml"), None, vec![])).await;
+    let LoadResult::Blocked(p) = r else { panic!() };
+    let text = p.iter().map(LoadProblem::describe).collect::<String>();
+    assert!(text.contains("トークン") && !text.contains("PW"), "{text}");
+    assert!(main.received_requests().await.unwrap().is_empty());
+}
+
+#[test]
+fn debug_of_load_params_hides_the_token() {
+    let p = params("https://h.example/x.yaml".into(), Some("TOKEN-XYZ"), vec![]);
+    assert!(!format!("{p:?}").contains("TOKEN-XYZ"));
 }

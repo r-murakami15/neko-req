@@ -354,6 +354,7 @@ pub fn convert(docs: &DocSet) -> Converted {
             let Some((ifile, iptr, ival)) = cx.deref(0, &item_ptr, item) else {
                 continue;
             };
+            cx.inl.begin_operation();
             let path_params = cx.parameters(ifile, &iptr, ival);
 
             let mut methods: Vec<(String, String, &Value)> = Vec::new();
@@ -371,6 +372,8 @@ pub fn convert(docs: &DocSet) -> Converted {
             }
 
             for (method, optr, op) in methods {
+                // 展開の上限は Operation ごとに数える
+                cx.inl.begin_operation();
                 let mut params = path_params.clone();
                 for p in cx.parameters(ifile, &optr, op) {
                     match params

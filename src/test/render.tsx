@@ -16,7 +16,14 @@ export function renderApp(backend: Backend = createMockBackend()) {
   } catch {
     /* 使えなくてもよい */
   }
-  useUiStore.setState({ currentProjectId: null, createDialogOpen: false, screen: "main", newRequestDialogOpen: false });
+  useUiStore.setState({
+    currentProjectId: null,
+    createDialogOpen: false,
+    screen: "main",
+    newRequestDialogOpen: false,
+    importDialogOpen: false,
+    syncDialogOpen: false,
+  });
   useTabsStore.getState().reset();
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const user = userEvent.setup();
