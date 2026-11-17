@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>履歴</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;family=Noto+Sans+JP:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#121418}
+a{color:#E7E9EC}a:hover{color:#FFFFFF}
+</style>
+</helmet>
+<div style="width: 1200px; height: 760px; box-sizing: border-box; background: #121418; color: #E7E9EC; font-family: Inter, 'Noto Sans JP', system-ui, sans-serif; font-size: 13px; display: flex; flex-direction: column; border: 1px solid #2B3038; border-radius: 12px; overflow: hidden;">
+  <header style="display: flex; align-items: center; gap: 12px; padding: 12px 20px; border-bottom: 1px solid #2B3038; background: #16191E;">
+    <a href="Main.dc.html" style="display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; border-radius: 6px; color: #A0A8B3; text-decoration: none;">
+      <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"></path></svg>
+      戻る
+    </a>
+    <h1 style="margin: 0; font-size: 16px; font-weight: 600;">履歴</h1>
+    <span style="color: #8B939E;">直近 1,000 件まで保存</span>
+    <button style="margin-left: auto; height: 30px; padding: 0 12px; border: 1px solid #343A44; border-radius: 6px; background: transparent; color: #FF9B9B; font: inherit;">すべて削除</button>
+  </header>
+
+  <div style="flex: 1 1 auto; display: grid; grid-template-columns: 460px minmax(0, 1fr); min-height: 0;">
+    <section aria-label="履歴の一覧" style="border-right: 1px solid #2B3038; display: flex; flex-direction: column; min-height: 0;">
+      <div style="padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; border-bottom: 1px solid #2B3038;">
+        <label style="display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; background: #1F232A; border: 1px solid #2B3038; border-radius: 6px; color: #8B939E;">
+          <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+          <input aria-label="URLやボディで検索" placeholder="URL やボディで検索" style="flex: 1 1 auto; min-width: 0; background: transparent; border: 0; color: #E7E9EC; font: inherit;" />
+        </label>
+        <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+          <sc-for list="{{chips}}" as="c" hint-placeholder-count="5">
+            <button aria-pressed="{{c.pressed}}" style="{{c.style}}">{{c.label}}</button>
+          </sc-for>
+        </div>
+      </div>
+      <div style="flex: 1 1 auto; overflow: auto; padding: 6px 8px;">
+        <sc-for list="{{groups}}" as="g" hint-placeholder-count="2">
+          <div style="display: flex; flex-direction: column;">
+            <div style="padding: 10px 8px 6px; color: #8B939E; font-size: 12px;">{{g.day}}</div>
+            <sc-for list="{{g.items}}" as="i" hint-placeholder-count="4">
+              <button style="{{i.rowStyle}}">
+                <span style="{{i.mStyle}}">{{i.m}}</span>
+                <span style="flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: 'JetBrains Mono', monospace; font-size: 12px;">{{i.path}}</span>
+                <span style="{{i.sStyle}}">{{i.status}}</span>
+                <span style="width: 54px; text-align: right; color: #8B939E; font-size: 12px;">{{i.ms}}</span>
+                <span style="width: 40px; text-align: right; color: #8B939E; font-size: 12px;">{{i.time}}</span>
+              </button>
+            </sc-for>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+
+    <section aria-labelledby="hist-h" style="padding: 18px 22px; display: flex; flex-direction: column; gap: 14px; min-width: 0;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 500; color: #F5A524;">POST</span>
+        <h2 id="hist-h" style="margin: 0; font-size: 15px; font-weight: 600;">パスワードログイン (1 段階目)</h2>
+        <span style="height: 20px; display: inline-flex; align-items: center; padding: 0 8px; border-radius: 4px; background: #3A2A1A; color: #F5C27A; font-family: 'JetBrains Mono', monospace; font-size: 11px;">400</span>
+        <span style="color: #8B939E;">ローカル · 今日 10:12 · 21 ms</span>
+      </div>
+      <div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #A0A8B3; overflow-wrap: anywhere;">http://localhost:8080/api/v1/auth/password-login</div>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+        <button style="height: 32px; padding: 0 14px; border: 0; border-radius: 6px; background: {{accent}}; color: #121418; font: inherit; font-weight: 600;">再送信</button>
+        <a href="RequestBody.dc.html" style="height: 32px; display: inline-flex; align-items: center; padding: 0 12px; border: 1px solid #343A44; border-radius: 6px; color: #E7E9EC; text-decoration: none;">編集して開く</a>
+        <a href="SaveRequest.dc.html" style="height: 32px; display: inline-flex; align-items: center; padding: 0 12px; border: 1px solid #343A44; border-radius: 6px; color: #E7E9EC; text-decoration: none;">コレクションに保存</a>
+        <button style="height: 32px; padding: 0 12px; border: 1px solid #343A44; border-radius: 6px; background: transparent; color: #E7E9EC; font: inherit;">cURL としてコピー</button>
+        <button style="height: 32px; padding: 0 12px; border: 1px solid #343A44; border-radius: 6px; background: transparent; color: #E7E9EC; font: inherit;">別の履歴と比較</button>
+      </div>
+      <div style="flex: 1 1 auto; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; min-height: 0;">
+        <div style="display: flex; flex-direction: column; gap: 6px; min-width: 0;">
+          <span style="color: #A0A8B3; font-size: 12px;">送信した内容</span>
+          <pre style="flex: 1 1 auto; margin: 0; padding: 12px; border: 1px solid #2B3038; border-radius: 8px; background: #16191E; font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.65; color: #C9CED6; overflow: auto;"><span style="color: #7CC4FF;">Content-Type</span>: application/json
+<span style="color: #7CC4FF;">X-XSRF-TOKEN</span>: ••••••••
+
+{
+  <span style="color: #7CC4FF;">"email"</span>: <span style="color: #9BDB8A;">""</span>,
+  <span style="color: #7CC4FF;">"password"</span>: <span style="color: #9BDB8A;">"********"</span>
+}</pre>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 6px; min-width: 0;">
+          <span style="color: #A0A8B3; font-size: 12px;">受け取ったレスポンス（application/problem+json）</span>
+          <pre style="flex: 1 1 auto; margin: 0; padding: 12px; border: 1px solid #2B3038; border-radius: 8px; background: #16191E; font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.65; color: #C9CED6; overflow: auto;">{
+  <span style="color: #7CC4FF;">"title"</span>: <span style="color: #9BDB8A;">"入力内容に誤りがあります"</span>,
+  <span style="color: #7CC4FF;">"status"</span>: <span style="color: #F5B95A;">400</span>,
+  <span style="color: #7CC4FF;">"detail"</span>: <span style="color: #9BDB8A;">"入力内容に誤りがあります。内容を確認してください。"</span>,
+  <span style="color: #7CC4FF;">"instance"</span>: <span style="color: #9BDB8A;">"/api/v1/auth/password-login"</span>,
+  <span style="color: #7CC4FF;">"code"</span>: <span style="color: #9BDB8A;">"VALIDATION_FAILED"</span>,
+  <span style="color: #7CC4FF;">"traceId"</span>: <span style="color: #9BDB8A;">"4bf92f3577b34da6a3ce929d0e0e4736"</span>,
+  <span style="color: #7CC4FF;">"errors"</span>: [
+    { <span style="color: #7CC4FF;">"field"</span>: <span style="color: #9BDB8A;">"email"</span>, <span style="color: #7CC4FF;">"code"</span>: <span style="color: #9BDB8A;">"REQUIRED"</span>, <span style="color: #7CC4FF;">"message"</span>: <span style="color: #9BDB8A;">"入力してください"</span> }
+  ]
+}</pre>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#A78BFA","options":["#A78BFA","#B794FF","#C4B5FD","#9F7AEA"]},"$preview":{"width":1200,"height":760}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var colors = { GET: '#4FC98E', POST: '#F5A524', PUT: '#5AA9FF', DELETE: '#FF7A7A', QUERY: '#2DD4BF' };
+    var item = function (m, path, status, ms, time, sel) {
+      var ok = status < 400;
+      return {
+        m: m, path: path, status: status, ms: ms + ' ms', time: time,
+        mStyle: 'width: 50px; flex: 0 0 50px; font-family: "JetBrains Mono", monospace; font-size: 11px; font-weight: 500; text-align: left; color: ' + colors[m] + ';',
+        sStyle: 'width: 40px; text-align: center; font-family: "JetBrains Mono", monospace; font-size: 11px; color: ' + (ok ? '#6FE0A6' : '#FF9B9B') + ';',
+        rowStyle: 'width: 100%; display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 8px; border: 0; border-radius: 6px; font: inherit; color: #C9CED6; background: ' + (sel ? '#2A2540' : 'transparent') + ';'
+      };
+    };
+    var chip = function (label, on) {
+      return { label: label, pressed: on ? 'true' : 'false', style: 'height: 26px; padding: 0 10px; border-radius: 13px; font: inherit; font-size: 12px; border: 1px solid ' + (on ? '#A78BFA' : '#343A44') + '; background: ' + (on ? '#2A2540' : 'transparent') + '; color: ' + (on ? '#E4DBFF' : '#A0A8B3') + ';' };
+    };
+    return {
+      accent: this.props.accent ?? '#A78BFA',
+      chips: [chip('すべて', true), chip('2xx'), chip('4xx'), chip('5xx'), chip('ローカル'), chip('期間')],
+      groups: [
+        { day: '今日', items: [
+          item('GET', '/api/v1/video/clients?q=Netflix', 200, 38, '10:24'),
+          item('POST', '/api/v1/auth/email-code-login', 200, 64, '10:15'),
+          item('POST', '/api/v1/auth/password-login', 200, 212, '10:14'),
+          item('POST', '/api/v1/auth/password-login', 400, 21, '10:12', true),
+          item('GET', '/api/v1/auth/session', 200, 9, '10:11')
+        ] },
+        { day: '昨日', items: [
+          item('GET', '/api/v1/video/works', 200, 44, '18:40'),
+          item('PUT', '/api/v1/video/works/1001', 422, 57, '18:31'),
+          item('DELETE', '/api/v1/video/media/3', 422, 33, '17:55'),
+          item('GET', '/api/v1/video/invoices?overdue=true', 200, 120, '17:20')
+        ] }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,208 @@
+openapi: 3.0.3
+info:
+  title: Sample API
+  version: 1.2.3
+  description: 分割された yaml の見本
+servers:
+  - url: http://localhost:8080
+    description: ローカル
+  - url: "https://{env}.example.com"
+    description: 本番
+    variables:
+      env:
+        default: api
+security:
+  - cookieAuth: []
+tags:
+  - name: users
+    description: ユーザー
+  - name: tree
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: SESSION
+    bearerAuth:
+      type: http
+      scheme: bearer
+  parameters:
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        default: 1
+        minimum: 1
+  responses:
+    NotFound:
+      description: 見つからない
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+  schemas:
+    UserList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/User"
+        total:
+          type: integer
+    User:
+      allOf:
+        - $ref: "#/components/schemas/Base"
+        - type: object
+          required: [name]
+          properties:
+            name:
+              type: string
+              minLength: 1
+              maxLength: 50
+              example: 太郎
+            email:
+              type: string
+              format: email
+              nullable: true
+            status:
+              $ref: "#/components/schemas/Status"
+    Base:
+      type: object
+      required: [id]
+      properties:
+        id:
+          type: integer
+          readOnly: true
+          example: 1
+    Status:
+      type: string
+      enum: [ACTIVE, INACTIVE]
+    UserInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        status:
+          $ref: "#/components/schemas/Status"
+    Node:
+      type: object
+      properties:
+        name:
+          type: string
+        child:
+          $ref: "#/components/schemas/Node"
+        children:
+          type: array
+          items:
+            $ref: "#/components/schemas/Node"
+    Problem:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+          example: NOT_FOUND
+        detail:
+          type: string
+paths:
+  /users:
+    get:
+      tags: [users]
+      operationId: listUsers
+      summary: ユーザー一覧
+      description: |
+        ユーザーを返す。
+
+        返すエラー:
+        | status | code | 状況 |
+        | --- | --- | --- |
+        | 404 | NOT_FOUND | 見つからない |
+      parameters:
+        - name: q
+          in: query
+          description: 名前の部分一致
+          schema:
+            type: string
+          example: foo
+        - $ref: "#/components/parameters/Page"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserList"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      tags: [users]
+      operationId: createUser
+      summary: ユーザー作成
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserInput"
+      responses:
+        "201":
+          description: created
+  /users/{userId}:
+    parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [users]
+      operationId: getUser
+      summary: ユーザー取得
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          description: オペレーション側の説明
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [users]
+      summary: ユーザー削除 (operationId なし)
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: deleted
+  /tree:
+    get:
+      tags: [tree]
+      operationId: getTree
+      summary: 循環するスキーマ
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Node"
+  /health:
+    get:
+      summary: ヘルスチェック
+      security: []
+      responses:
+        "200":
+          description: ok

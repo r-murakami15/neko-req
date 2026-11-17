@@ -1,0 +1,18 @@
+openapi: 3.0.3
+info:
+  title: Missing
+  version: "1"
+paths:
+  /a:
+    $ref: "./paths/gone.yaml#/paths/~1a"
+  /b:
+    $ref: "./paths/gone.yaml#/paths/~1b"
+  /c:
+    get:
+      responses:
+        "200":
+          description: x
+          content:
+            application/json:
+              schema:
+                $ref: "./nothere/schema.yaml#/X"

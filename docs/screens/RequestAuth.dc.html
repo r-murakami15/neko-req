@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>リクエスト 認証</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;family=Noto+Sans+JP:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#121418}
+a{color:#E7E9EC}a:hover{color:#FFFFFF}
+</style>
+</helmet>
+<div style="width: 760px; height: 640px; box-sizing: border-box; background: #121418; color: #E7E9EC; font-family: Inter, 'Noto Sans JP', system-ui, sans-serif; font-size: 13px; display: flex; flex-direction: column; border: 1px solid #2B3038; border-radius: 12px; overflow: hidden;">
+  <div style="padding: 14px 16px; display: flex; gap: 8px; border-bottom: 1px solid #2B3038;">
+    <div style="flex: 1 1 auto; display: flex; height: 38px; border: 1px solid #343A44; border-radius: 8px; background: #1A1D23; overflow: hidden;">
+      <span style="width: 80px; display: inline-flex; align-items: center; padding: 0 12px; background: #1F232A; border-right: 1px solid #343A44; color: #4FC98E; font-family: 'JetBrains Mono', monospace; font-weight: 500;">GET</span>
+      <input aria-label="リクエストURL" value="{{url}}" style="flex: 1 1 auto; min-width: 0; background: transparent; border: 0; color: #E7E9EC; padding: 0 12px; font-family: 'JetBrains Mono', monospace; font-size: 13px;" />
+    </div>
+    <button style="height: 38px; padding: 0 22px; border: 0; border-radius: 8px; background: {{accent}}; color: #121418; font: inherit; font-weight: 600;">送信</button>
+  </div>
+  <div role="tablist" aria-label="リクエスト設定" style="display: flex; gap: 18px; padding: 0 16px; border-bottom: 1px solid #2B3038;">
+    <a href="Main.dc.html" role="tab" aria-selected="false" style="height: 38px; box-sizing: border-box; display: inline-flex; align-items: center; border-bottom: 2px solid transparent; color: #A0A8B3; text-decoration: none;">パラメータ (2)</a>
+    <a href="RequestHeaders.dc.html" role="tab" aria-selected="false" style="height: 38px; box-sizing: border-box; display: inline-flex; align-items: center; border-bottom: 2px solid transparent; color: #A0A8B3; text-decoration: none;">ヘッダー (1)</a>
+    <a href="RequestBody.dc.html" role="tab" aria-selected="false" style="height: 38px; box-sizing: border-box; display: inline-flex; align-items: center; border-bottom: 2px solid transparent; color: #A0A8B3; text-decoration: none;">ボディ</a>
+    <span role="tab" aria-selected="true" style="height: 38px; box-sizing: border-box; display: inline-flex; align-items: center; border-bottom: 2px solid {{accent}}; font-weight: 500;">認証</span>
+    <a href="RequestDesign.dc.html" role="tab" aria-selected="false" style="height: 38px; box-sizing: border-box; display: inline-flex; align-items: center; border-bottom: 2px solid transparent; color: #A0A8B3; text-decoration: none;">設計</a>
+  </div>
+
+  <div style="flex: 1 1 auto; display: grid; grid-template-columns: 220px minmax(0, 1fr); min-height: 0;">
+    <div role="radiogroup" aria-label="認証方式" style="padding: 16px 12px; border-right: 1px solid #2B3038; display: flex; flex-direction: column; gap: 4px;">
+      <span style="padding: 0 4px 8px; color: #A0A8B3; font-size: 12px;">認証方式</span>
+      <sc-for list="{{kinds}}" as="k" hint-placeholder-count="7">
+        <label style="{{k.style}}">
+          <input type="radio" name="auth" checked="{{k.on}}" style="accent-color: {{accent}};" />
+          <span style="display: flex; flex-direction: column; gap: 1px;"><span>{{k.label}}</span><span style="color: #8B939E; font-size: 11px;">{{k.sub}}</span></span>
+        </label>
+      </sc-for>
+    </div>
+
+    <div style="padding: 18px 20px; display: flex; flex-direction: column; gap: 14px;">
+      <div style="display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 8px; background: #221E33; border: 1px solid #3B3360; color: #D9CCFF; font-size: 12px;">
+        <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v5"></path><path d="M12 16h.01"></path></svg>
+        OpenAPI の securitySchemes「cookieAuth」から設定されました
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px;">
+        <label style="display: flex; flex-direction: column; gap: 6px; color: #A0A8B3;">送り先
+          <select style="height: 36px; padding: 0 10px; background: #1A1D23; color: #E7E9EC; border: 1px solid #343A44; border-radius: 8px; font: inherit;"><option>Cookie</option><option>ヘッダー</option><option>クエリ</option></select>
+        </label>
+        <label style="display: flex; flex-direction: column; gap: 6px; color: #A0A8B3;">名前
+          <input value="SESSION" style="height: 36px; box-sizing: border-box; border: 1px solid #343A44; border-radius: 8px; background: #1A1D23; color: #E7E9EC; padding: 0 12px; font-family: 'JetBrains Mono', monospace; font-size: 13px;" />
+        </label>
+      </div>
+
+      <label style="display: flex; flex-direction: column; gap: 6px; color: #A0A8B3;">値
+        <input value="{{sessionVar}}" style="height: 36px; box-sizing: border-box; border: 1px solid #343A44; border-radius: 8px; background: #1A1D23; color: #C4B5FD; padding: 0 12px; font-family: 'JetBrains Mono', monospace; font-size: 13px;" />
+      </label>
+
+      <div style="display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; border: 1px solid #2B3038; border-radius: 8px; background: #16191E;">
+        <label style="display: flex; gap: 10px; align-items: flex-start;"><input type="checkbox" checked="{{ true }}" style="margin-top: 2px; accent-color: {{accent}};" /><span style="display: flex; flex-direction: column; gap: 2px;"><span>ログインの API の Set-Cookie から SESSION を自動で更新</span><span style="color: #8B939E; font-size: 12px;">createEmailCodeLogin・createPasskeyLogin の成功時</span></span></label>
+        <label style="display: flex; gap: 10px; align-items: flex-start;"><input type="checkbox" checked="{{ true }}" style="margin-top: 2px; accent-color: {{accent}};" /><span style="display: flex; flex-direction: column; gap: 2px;"><span>GET 以外では CSRF トークンを自動で付ける</span><span style="color: #8B939E; font-size: 12px;">XSRF-TOKEN Cookie の値を X-XSRF-TOKEN ヘッダーに入れる</span></span></label>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <span style="color: #A0A8B3;">送信されるヘッダー</span>
+        <code style="padding: 10px 12px; border-radius: 8px; background: #16191E; border: 1px solid #2B3038; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #C9CED6;">Cookie: SESSION=••••••••; XSRF-TOKEN=••••••••</code>
+      </div>
+
+      <div style="margin-top: auto; display: flex; gap: 8px; align-items: center; color: #8B939E; font-size: 12px;">
+        <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg>
+        セッションの値はOSのキーチェーンに保存され、プロジェクトファイルには書き込まれません
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#A78BFA","options":["#A78BFA","#B794FF","#C4B5FD","#9F7AEA"]},"$preview":{"width":760,"height":640}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var v = function (s) { return '{' + '{' + s + '}' + '}'; };
+    var list = [
+      ['プロジェクトの既定を使う', 'security: cookieAuth'],
+      ['なし', 'security: [] の API（6 件）'],
+      ['API キー', 'ヘッダー / クエリ / Cookie'],
+      ['Bearer トークン', 'Authorization ヘッダー'],
+      ['Basic 認証', 'ユーザー名とパスワード'],
+      ['OAuth 2.0', '認可コード・クライアント認証など'],
+      ['Digest 認証', '']
+    ];
+    var kinds = list.map(function (x) {
+      var on = x[0] === 'API キー';
+      return {
+        label: x[0], sub: x[1], on: on,
+        style: 'display: flex; align-items: flex-start; gap: 10px; padding: 8px 10px; border-radius: 8px; background: ' + (on ? '#2A2540' : 'transparent') + ';'
+      };
+    });
+    return {
+      accent: this.props.accent ?? '#A78BFA',
+      url: v('baseUrl') + '/api/v1/video/clients?q=Netflix&perPage=20',
+      sessionVar: v('session'),
+      kinds: kinds
+    };
+  }
+}
+</script>
+</body>
+</html>

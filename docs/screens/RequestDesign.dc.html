@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>リクエスト 設計</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;family=Noto+Sans+JP:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#121418}
+a{color:#C4B5FD}a:hover{color:#E4DBFF}
+</style>
+</helmet>
+<div style="min-height: 2000px; background: #121418; color: #E7E9EC; font-family: Inter, 'Noto Sans JP', system-ui, sans-serif; font-size: 13px; display: flex; flex-direction: column;">
+  <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid #2B3038; background: #16191E;">
+    <div style="display: flex; align-items: center; gap: 10px; flex: 1 1 320px; min-width: 0;">
+      <div aria-hidden="true" style="width: 28px; height: 28px; border-radius: 7px; background: {{accent}}; display: flex; align-items: center; justify-content: center; color: #121418; font-weight: 600; font-family: 'JetBrains Mono', monospace; font-size: 12px;">&gt;_</div>
+      <span style="font-weight: 600; font-size: 14px;">[アプリ名]</span>
+      <span aria-hidden="true" style="color: #6B7380;">/</span>
+      <span style="font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">日本アニメーション ライセンス契約管理システム API</span>
+      <span style="color: #8B939E; font-size: 12px; white-space: nowrap;">v0.1.0 · OpenAPI 3.0.3</span>
+    </div>
+    <label style="display: flex; align-items: center; gap: 8px; color: #A0A8B3;">環境
+      <select style="height: 32px; padding: 0 10px; background: #1F232A; color: #E7E9EC; border: 1px solid #2B3038; border-radius: 6px; font: inherit;">
+        <option>ローカル (Dev Container)</option>
+      </select>
+    </label>
+    <a href="Settings.dc.html" aria-label="設定" style="width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid #2B3038; border-radius: 6px; background: #1F232A; color: #A0A8B3; text-decoration: none;">
+      <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3"></path><path d="M12 19v3"></path><path d="M2 12h3"></path><path d="M19 12h3"></path><path d="M4.9 4.9l2.1 2.1"></path><path d="M17 17l2.1 2.1"></path><path d="M4.9 19.1L7 17"></path><path d="M17 7l2.1-2.1"></path></svg>
+    </a>
+  </header>
+
+  <div style="display: flex; flex-wrap: wrap; flex: 1 1 auto;">
+    <nav aria-label="API ツリー" style="flex: 1 1 260px; background: #16191E; border-right: 1px solid #2B3038; display: flex; flex-direction: column; gap: 10px; padding: 14px 10px;">
+      <label style="display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; background: #1F232A; border: 1px solid #2B3038; border-radius: 6px; color: #8B939E;">
+        <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+        <input aria-label="API を検索" placeholder="API・operationId を検索" style="flex: 1 1 auto; min-width: 0; background: transparent; border: 0; color: #E7E9EC; font: inherit;">
+      </label>
+      <span style="padding: 0 8px; color: #8B939E; font-size: 12px;">88 件 · タグ 19</span>
+      <div style="display: flex; flex-direction: column; gap: 1px;">
+        <sc-for list="{{tags}}" as="t" hint-placeholder-count="8">
+          <div style="display: flex; flex-direction: column; gap: 1px;">
+            <button style="display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 8px; background: transparent; border: 0; border-radius: 6px; color: #C9CED6; font: inherit; text-align: left;">
+              <span aria-hidden="true" style="width: 12px; color: #8B939E;">{{t.chevron}}</span>
+              <span style="flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{t.name}}</span>
+              <span style="color: #8B939E; font-size: 12px;">{{t.count}}</span>
+            </button>
+            <sc-if value="{{t.open}}" hint-placeholder-val="{{ false }}">
+              <sc-for list="{{t.ops}}" as="o" hint-placeholder-count="6">
+                <button style="{{o.rowStyle}}">
+                  <span style="{{o.mStyle}}">{{o.m}}</span>
+                  <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{o.name}}</span>
+                </button>
+              </sc-for>
+            </sc-if>
+          </div>
+        </sc-for>
+      </div>
+    </nav>
+
+    <main style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column;">
+      <div role="tablist" aria-label="開いているリクエスト" style="display: flex; border-bottom: 1px solid #2B3038; background: #16191E; overflow-x: auto;">
+        <span role="tab" aria-selected="true" style="display: flex; align-items: center; gap: 8px; height: 38px; box-sizing: border-box; padding: 0 14px; background: #121418; border-right: 1px solid #2B3038; border-top: 2px solid {{accent}};">
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 500; color: #F5A524;">POST</span>パスワードログイン (1 段階目)
+        </span>
+      </div>
+
+      <div style="padding: 14px 16px; display: flex; flex-wrap: wrap; gap: 8px; border-bottom: 1px solid #2B3038;">
+        <div style="flex: 1 1 420px; display: flex; height: 38px; border: 1px solid #343A44; border-radius: 8px; background: #1A1D23; overflow: hidden;">
+          <span style="width: 80px; display: inline-flex; align-items: center; padding: 0 12px; background: #1F232A; border-right: 1px solid #343A44; color: #F5A524; font-family: 'JetBrains Mono', monospace; font-weight: 500;">POST</span>
+          <input aria-label="リクエストURL" value="{{url}}" style="flex: 1 1 auto; min-width: 0; background: transparent; border: 0; color: #E7E9EC; padding: 0 12px; font-family: 'JetBrains Mono', monospace; font-size: 13px;">
+        </div>
+        <button style="height: 38px; padding: 0 22px; border: 0; border-radius: 8px; background: {{accent}}; color: #121418; font: inherit; font-weight: 600;">送信</button>
+        <a href="SaveRequest.dc.html" style="height: 38px; box-sizing: border-box; display: inline-flex; align-items: center; padding: 0 14px; border: 1px solid #2B3038; border-radius: 8px; background: #1F232A; color: #E7E9EC; text-decoration: none;">保存</a>
+      </div>
+
+      <div role="tablist" aria-label="リクエスト設定" style="display: flex; gap: 18px; padding: 0 16px; border-bottom: 1px solid #2B3038; overflow-x: auto;">
+        <a href="Main.dc.html" role="tab" aria-selected="false" style="height: 38px; box-sizing: border-box; display: inline-flex; align-items: center; border-bottom: 2px solid transparent; color: #A0A8B3; text-decoration: none;">パラメータ</a>
+        <a href="RequestHeaders.dc.html" role="tab" aria-selected="false" style="height: 38px; box-sizing: border-box; display: inline-flex; align-items: center; border-bottom: 2px solid transparent; color: #A0A8B3; text-decoration: none;">ヘッダー</a>
+        <a href="RequestBody.dc.html" role="tab" aria-selected="false" style="height: 38px; box-sizing: border-box; display: inline-flex; align-items: center; border-bottom: 2px solid transparent; color: #A0A8B3; text-decoration: none;">ボディ</a>
+        <a href="RequestAuth.dc.html" role="tab" aria-selected="false" style="height: 38px; box-sizing: border-box; display: inline-flex; align-items: center; border-bottom: 2px solid transparent; color: #A0A8B3; text-decoration: none;">認証</a>
+        <span role="tab" aria-selected="true" style="height: 38px; box-sizing: border-box; display: inline-flex; align-items: center; gap: 6px; border-bottom: 2px solid {{accent}}; font-weight: 500;">
+          <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M6 3h9l4 4v14H6z"></path><path d="M9 12h7"></path><path d="M9 16h7"></path></svg>
+          設計
+        </span>
+      </div>
+
+      <article style="width: 100%; max-width: 1080px; box-sizing: border-box; padding: 24px 28px 48px; display: flex; flex-direction: column; gap: 28px;">
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+          <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px;">
+            <h1 style="margin: 0; font-size: 22px; font-weight: 600;">パスワードログイン (1 段階目)</h1>
+            <span style="height: 22px; display: inline-flex; align-items: center; padding: 0 8px; border-radius: 4px; background: #23272F; color: #C9CED6; font-size: 12px;">tag: auth</span>
+            <span style="height: 22px; display: inline-flex; align-items: center; padding: 0 8px; border-radius: 4px; background: #143525; color: #6FE0A6; font-size: 12px;">認証不要（security: []）</span>
+          </div>
+          <div style="display: flex; flex-wrap: wrap; gap: 18px; color: #8B939E; font-size: 12px;">
+            <span>operationId <code style="font-family: 'JetBrains Mono', monospace; color: #E4DBFF;">createPasswordLogin</code></span>
+            <span>取り込み元 <a href="ExportImport.dc.html" style="font-family: 'JetBrains Mono', monospace;">openapi.bundled.yaml:3709</a></span>
+            <span>最終取り込み 2026/11/16 14:24</span>
+          </div>
+        </div>
+
+        <section aria-labelledby="desc-h" style="display: flex; flex-direction: column; gap: 10px;">
+          <h2 id="desc-h" style="margin: 0; font-size: 15px; font-weight: 600;">説明</h2>
+          <div style="padding: 18px 20px; border: 1px solid #2B3038; border-radius: 10px; background: #16191E; line-height: 1.75; display: flex; flex-direction: column; gap: 12px;">
+            <p style="margin: 0;">メールアドレスとパスワードを確かめ、合っていれば 6 桁の認証コードをメールで送る。ログインはまだ完了しない (2 段階目は <code style="font-family: 'JetBrains Mono', monospace; color: #E4DBFF;">createEmailCodeLogin</code>)。</p>
+            <ul style="margin: 0; padding-left: 20px; color: #C9CED6;">
+              <li>コードの有効期限は 10 分、入力できるのは 5 回まで。前に送ったコードは使えなくなる</li>
+              <li>パスワードを 5 回続けて間違えると 15 分ロックする。ロック中は正しいパスワードでも失敗にする</li>
+              <li>未登録・不一致・停止中・ロック中はすべて同じ 401 (LOGIN_FAILED)。未登録でもパスワードの照合を行い、応答時間を揃える</li>
+              <li>送ったコードはログに出さない</li>
+            </ul>
+            <h3 style="margin: 4px 0 0; font-size: 13px; font-weight: 600;">画面に出すメッセージ</h3>
+            <div style="overflow-x: auto; border: 1px solid #2B3038; border-radius: 8px;">
+              <table style="width: 100%; border-collapse: collapse;">
+                <thead><tr style="background: #1A1D23; color: #A0A8B3; font-size: 12px; text-align: left;"><th style="padding: 8px 12px; font-weight: 500;">状況</th><th style="padding: 8px 12px; font-weight: 500;">メッセージ</th><th style="padding: 8px 12px; font-weight: 500;">返し方</th></tr></thead>
+                <tbody><tr style="border-top: 1px solid #2B3038;"><td style="padding: 8px 12px;">ログインできない (理由は分けない)</td><td style="padding: 8px 12px;">メールアドレスまたはパスワードが正しくありません</td><td style="padding: 8px 12px; font-family: 'JetBrains Mono', monospace;">401 (LOGIN_FAILED)</td></tr></tbody>
+              </table>
+            </div>
+            <h3 style="margin: 4px 0 0; font-size: 13px; font-weight: 600;">返すエラー</h3>
+            <div style="overflow-x: auto; border: 1px solid #2B3038; border-radius: 8px;">
+              <table style="width: 100%; border-collapse: collapse;">
+                <thead><tr style="background: #1A1D23; color: #A0A8B3; font-size: 12px; text-align: left;"><th style="padding: 8px 12px; font-weight: 500;">status</th><th style="padding: 8px 12px; font-weight: 500;">code</th><th style="padding: 8px 12px; font-weight: 500;">状況</th></tr></thead>
+                <tbody><tr style="border-top: 1px solid #2B3038;"><td style="padding: 8px 12px; font-family: 'JetBrains Mono', monospace;">401</td><td style="padding: 8px 12px; font-family: 'JetBrains Mono', monospace;">LOGIN_FAILED</td><td style="padding: 8px 12px;">ログインの失敗</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section aria-labelledby="req-h" style="display: flex; flex-direction: column; gap: 14px;">
+          <h2 id="req-h" style="margin: 0; font-size: 15px; font-weight: 600;">リクエスト</h2>
+          <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px;">
+            <div style="padding: 12px 14px; border: 1px solid #2B3038; border-radius: 8px; background: #16191E; display: flex; flex-direction: column; gap: 4px;"><span style="color: #8B939E; font-size: 12px;">パラメータ</span><span>なし</span></div>
+            <div style="padding: 12px 14px; border: 1px solid #2B3038; border-radius: 8px; background: #16191E; display: flex; flex-direction: column; gap: 4px;"><span style="color: #8B939E; font-size: 12px;">Content-Type</span><span style="font-family: 'JetBrains Mono', monospace;">application/json</span></div>
+            <div style="padding: 12px 14px; border: 1px solid #2B3038; border-radius: 8px; background: #16191E; display: flex; flex-direction: column; gap: 4px;"><span style="color: #8B939E; font-size: 12px;">ボディ</span><span>必須 · <code style="font-family: 'JetBrains Mono', monospace; color: #E4DBFF;">PasswordLoginRequest</code></span></div>
+          </div>
+
+          <div style="border: 1px solid #2B3038; border-radius: 10px; overflow: hidden;">
+            <div style="padding: 10px 14px; background: #1A1D23; border-bottom: 1px solid #2B3038; color: #A0A8B3; font-size: 12px;">データモデル</div>
+            <div style="overflow-x: auto;">
+              <table style="width: 100%; min-width: 720px; border-collapse: collapse;">
+                <thead><tr style="color: #8B939E; font-size: 12px; text-align: left;"><th style="padding: 8px 14px; font-weight: 500;">名前</th><th style="padding: 8px 14px; font-weight: 500;">型</th><th style="padding: 8px 14px; font-weight: 500;">必須</th><th style="padding: 8px 14px; font-weight: 500;">制約</th><th style="padding: 8px 14px; font-weight: 500;">説明</th></tr></thead>
+                <tbody>
+                  <sc-for list="{{reqRows}}" as="r" hint-placeholder-count="3">
+                    <tr style="border-top: 1px solid #2B3038;">
+                      <td style="{{r.nameStyle}}">{{r.name}}</td>
+                      <td style="{{r.typeStyle}}">{{r.type}}</td>
+                      <td style="padding: 9px 14px; color: #FF8F8F;">{{r.req}}</td>
+                      <td style="padding: 9px 14px; color: #A0A8B3; font-size: 12px;">{{r.rule}}</td>
+                      <td style="padding: 9px 14px; color: #C9CED6;">{{r.desc}}</td>
+                    </tr>
+                  </sc-for>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div style="border: 1px solid #2B3038; border-radius: 10px; overflow: hidden;">
+            <div style="display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: #1A1D23; border-bottom: 1px solid #2B3038; font-size: 12px;">
+              <span style="color: #A0A8B3;">例</span><span style="color: #8B939E;">（スキーマから自動生成したモック）</span>
+              <a href="RequestBody.dc.html" style="margin-left: auto;">ボディに反映</a>
+            </div>
+            <pre style="margin: 0; padding: 14px 16px; background: #16191E; font-family: 'JetBrains Mono', monospace; font-size: 12.5px; line-height: 1.7; color: #C9CED6;">{
+  <span style="color: #7CC4FF;">"email"</span>: <span style="color: #9BDB8A;">"user@example.com"</span>,
+  <span style="color: #7CC4FF;">"password"</span>: <span style="color: #9BDB8A;">"********"</span>
+}</pre>
+          </div>
+        </section>
+
+        <section aria-labelledby="res-h" style="display: flex; flex-direction: column; gap: 14px;">
+          <h2 id="res-h" style="margin: 0; font-size: 15px; font-weight: 600;">レスポンス</h2>
+          <div role="tablist" aria-label="ステータスコード" style="display: flex; flex-wrap: wrap; gap: 6px;">
+            <sc-for list="{{codes}}" as="c" hint-placeholder-count="5">
+              <button role="tab" aria-selected="{{c.selected}}" onClick="{{c.pick}}" style="{{c.style}}">
+                <span style="{{c.numStyle}}">{{c.code}}</span>{{c.label}}
+              </button>
+            </sc-for>
+          </div>
+
+          <div style="border: 1px solid #2B3038; border-radius: 10px; overflow: hidden;">
+            <div style="display: flex; flex-wrap: wrap; gap: 20px; padding: 12px 14px; background: #1A1D23; border-bottom: 1px solid #2B3038; font-size: 12px;">
+              <span><span style="color: #8B939E;">ステータス</span> {{cur.code}}</span>
+              <span><span style="color: #8B939E;">Content-Type</span> <span style="font-family: 'JetBrains Mono', monospace;">{{cur.ctype}}</span></span>
+              <span><span style="color: #8B939E;">スキーマ</span> <code style="font-family: 'JetBrains Mono', monospace; color: #E4DBFF;">{{cur.schema}}</code></span>
+            </div>
+            <p style="margin: 0; padding: 12px 14px; color: #C9CED6; line-height: 1.7; border-bottom: 1px solid #2B3038;">{{cur.desc}}</p>
+            <sc-if value="{{cur.isError}}" hint-placeholder-val="{{ false }}">
+              <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 14px; border-bottom: 1px solid #2B3038; font-size: 12px;">
+                <span style="color: #8B939E;">この API で返す code</span>
+                <span style="height: 22px; display: inline-flex; align-items: center; padding: 0 8px; border-radius: 4px; background: #3A1D1D; color: #FFB4B4; font-family: 'JetBrains Mono', monospace;">{{cur.errCode}}</span>
+                <span style="color: #A0A8B3;">{{cur.errNote}}</span>
+              </div>
+            </sc-if>
+            <div style="overflow-x: auto;">
+              <table style="width: 100%; min-width: 720px; border-collapse: collapse;">
+                <thead><tr style="color: #8B939E; font-size: 12px; text-align: left;"><th style="padding: 8px 14px; font-weight: 500;">名前</th><th style="padding: 8px 14px; font-weight: 500;">型</th><th style="padding: 8px 14px; font-weight: 500;">必須</th><th style="padding: 8px 14px; font-weight: 500;">例</th><th style="padding: 8px 14px; font-weight: 500;">説明</th></tr></thead>
+                <tbody>
+                  <sc-for list="{{cur.rows}}" as="r" hint-placeholder-count="4">
+                    <tr style="border-top: 1px solid #2B3038;">
+                      <td style="{{r.nameStyle}}">{{r.name}}</td>
+                      <td style="{{r.typeStyle}}">{{r.type}}</td>
+                      <td style="padding: 9px 14px; color: #FF8F8F;">{{r.req}}</td>
+                      <td style="padding: 9px 14px; color: #A0A8B3; font-family: 'JetBrains Mono', monospace; font-size: 12px;">{{r.ex}}</td>
+                      <td style="padding: 9px 14px; color: #C9CED6;">{{r.desc}}</td>
+                    </tr>
+                  </sc-for>
+                </tbody>
+              </table>
+            </div>
+            <sc-if value="{{cur.isOk}}" hint-placeholder-val="{{ true }}">
+              <div style="border-top: 1px solid #2B3038;">
+                <div style="padding: 10px 14px; background: #1A1D23; color: #A0A8B3; font-size: 12px;">例（スキーマの example から生成）</div>
+                <pre style="margin: 0; padding: 14px 16px; background: #16191E; font-family: 'JetBrains Mono', monospace; font-size: 12.5px; line-height: 1.7; color: #C9CED6;">{
+  <span style="color: #7CC4FF;">"data"</span>: {
+    <span style="color: #7CC4FF;">"expiresAt"</span>: <span style="color: #9BDB8A;">"2026-11-11T10:10:00+09:00"</span>,
+    <span style="color: #7CC4FF;">"resendAvailableAt"</span>: <span style="color: #9BDB8A;">"2026-11-11T10:01:00+09:00"</span>
+  }
+}</pre>
+              </div>
+            </sc-if>
+          </div>
+        </section>
+      </article>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#A78BFA","options":["#A78BFA","#B794FF","#C4B5FD","#9F7AEA"]},"$preview":{"width":1440,"height":2000}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { code: '200' };
+  }
+  renderVals() {
+    var self = this;
+    var accent = this.props.accent ?? '#A78BFA';
+    var mc = { GET: '#4FC98E', POST: '#F5A524', PUT: '#5AA9FF', DELETE: '#FF7A7A' };
+    var op = function (m, name, active) {
+      return {
+        m: m, name: name,
+        mStyle: 'width: 48px; flex: 0 0 48px; font-family: "JetBrains Mono", monospace; font-size: 10.5px; font-weight: 500; color: ' + mc[m] + ';',
+        rowStyle: 'display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 8px 0 26px; border: 0; border-radius: 6px; font: inherit; font-size: 12.5px; text-align: left; color: ' + (active ? '#FFFFFF' : '#C9CED6') + '; background: ' + (active ? '#2A2540' : 'transparent') + ';'
+      };
+    };
+    var closed = function (name, count) { return { name: name, count: count, open: false, chevron: '▸', ops: [] }; };
+    var tags = [
+      { name: 'auth', count: 11, open: true, chevron: '▾', ops: [
+        op('GET', 'ログイン状態取得'), op('DELETE', 'ログアウト'), op('POST', 'パスワードログイン (1 段階目)', true),
+        op('POST', 'メール認証コードログイン (2 段階目)'), op('POST', 'メール認証コード再送'), op('POST', 'パスキーログインのチャレンジ発行'),
+        op('POST', 'パスキーログイン'), op('GET', 'パスキー一覧取得'), op('POST', 'パスキー登録'), op('POST', 'パスキー登録のチャレンジ発行'), op('DELETE', 'パスキー削除')
+      ] },
+      closed('file', 2), closed('kikaku-category', 5), closed('video-user', 3), closed('video-client', 3), closed('video-client-detail', 6),
+      closed('video-destination', 2), closed('video-contract', 4), closed('video-sales-report', 3), closed('video-media', 4), closed('video-work', 6),
+      closed('video-payee', 4), closed('video-invoice', 12), closed('video-own-distribution', 3), closed('video-bank-transaction', 3),
+      closed('video-reconcile', 2), closed('video-payout', 8), closed('video-expense', 3), closed('video-announcement', 4)
+    ];
+    var row = function (name, type, req, rule, desc, depth, isObj) {
+      return {
+        name: name, type: type, req: req ? '必須' : '', rule: rule, ex: rule, desc: desc,
+        nameStyle: 'padding: 9px 14px 9px ' + (14 + depth * 22) + 'px; font-family: "JetBrains Mono", monospace; color: ' + (depth === 0 && isObj ? '#C4B5FD' : '#E7E9EC') + ';',
+        typeStyle: 'padding: 9px 14px; font-family: "JetBrains Mono", monospace; color: ' + (isObj ? '#7CC4FF' : '#7FD9A0') + ';'
+      };
+    };
+    var reqRows = [
+      row('(ルート)', 'object', false, '', 'パスワードログイン (1 段階目) のリクエスト', 0, true),
+      row('email', 'string', true, '1〜254 文字', 'メールアドレス', 1),
+      row('password', 'string<password>', true, '1〜72 文字', 'パスワード (ログに出さない)', 1)
+    ];
+    var okRows = [
+      row('(ルート)', 'object', false, '', '認証コード送信の成功レスポンス', 0, true),
+      row('data', 'EmailCodeSent', true, '', '認証コードを送った結果', 1, true),
+      row('expiresAt', 'string<date-time>', true, '2026-11-11T10:10:00+09:00', 'コードの有効期限', 2),
+      row('resendAvailableAt', 'string<date-time>', true, '2026-11-11T10:01:00+09:00', '再送できるようになる日時', 2)
+    ];
+    var errRows = [
+      row('(ルート)', 'object', false, '', 'エラーレスポンス (RFC 9457 Problem Details)', 0, true),
+      row('title', 'string', true, '', 'エラーの概要 (利用者向け。code ごとに固定)', 1),
+      row('status', 'integer<int32>', true, '', 'HTTP ステータス', 1),
+      row('detail', 'string | null', false, '', 'エラーの詳細 (利用者向け)。ないときは null', 1),
+      row('instance', 'string | null', false, '', 'リクエストのパス (クエリ文字列は含めない)', 1),
+      row('code', 'ErrorCode', true, '', '機械判定用のコード', 1),
+      row('traceId', 'string', true, '', 'ログと突き合わせる ID (32 桁の 16 進数)', 1),
+      row('errors', 'ProblemFieldError[] | null', false, '', '項目単位のエラー。ないときは null', 1, true)
+    ];
+    var defs = {
+      '200': { label: '認証コードを送った', color: '#6FE0A6', ctype: 'application/json', schema: 'EmailCodeSentApiResponse', desc: '認証コードを送った', rows: okRows, isOk: true },
+      '400': { label: '入力チェックエラー', color: '#F5B95A', ctype: 'application/problem+json', schema: 'ApiProblem', desc: '入力チェックエラー (VALIDATION_FAILED)。画面に出す文言を detail に返す。項目が分かるときは errors に項目ごとのエラーを返す', errCode: 'VALIDATION_FAILED', errNote: 'errors に項目ごとのエラーが入る' },
+      '401': { label: 'ログインの失敗', color: '#F5B95A', ctype: 'application/problem+json', schema: 'ApiProblem', desc: '未ログイン・セッション切れ (UNAUTHENTICATED)。ログインの API ではログインの失敗 (LOGIN_FAILED。理由は分けない)', errCode: 'LOGIN_FAILED', errNote: '画面には「メールアドレスまたはパスワードが正しくありません」' },
+      '403': { label: '権限なし・CSRF', color: '#F5B95A', ctype: 'application/problem+json', schema: 'ApiProblem', desc: '権限がない (所属していないシステムの API など)、または CSRF トークンが合わない (FORBIDDEN)', errCode: 'FORBIDDEN', errNote: '' },
+      '500': { label: '想定外のエラー', color: '#FF8F8F', ctype: 'application/problem+json', schema: 'ApiProblem', desc: '想定外のエラー (INTERNAL_ERROR。DB の失敗を含む)。画面には固定の文言と traceId を出す', errCode: 'INTERNAL_ERROR', errNote: '画面には固定の文言と traceId' }
+    };
+    var curCode = this.state.code;
+    var codes = ['200', '400', '401', '403', '500'].map(function (k) {
+      var on = k === curCode;
+      return {
+        code: k, label: defs[k].label, selected: on ? 'true' : 'false',
+        pick: function () { self.setState({ code: k }); },
+        numStyle: 'font-family: "JetBrains Mono", monospace; font-weight: 600; margin-right: 6px; color: ' + defs[k].color + ';',
+        style: 'height: 34px; padding: 0 12px; border-radius: 8px; font: inherit; border: 1px solid ' + (on ? accent : '#343A44') + '; background: ' + (on ? '#221E33' : '#16191E') + '; color: ' + (on ? '#FFFFFF' : '#A0A8B3') + ';'
+      };
+    });
+    var d = defs[curCode];
+    var cur = {
+      code: curCode, ctype: d.ctype, schema: d.schema, desc: d.desc,
+      isOk: !!d.isOk, isError: !d.isOk, errCode: d.errCode || '', errNote: d.errNote || '',
+      rows: d.isOk ? d.rows : errRows
+    };
+    return { accent: accent, url: '{' + '{baseUrl}' + '}/api/v1/auth/password-login', tags: tags, reqRows: reqRows, codes: codes, cur: cur };
+  }
+}
+</script>
+</body>
+</html>

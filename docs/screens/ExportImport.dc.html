@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>エクスポートとインポート</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;family=Noto+Sans+JP:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#121418}
+a{color:#E7E9EC}a:hover{color:#FFFFFF}
+</style>
+</helmet>
+<div style="width: 960px; height: 760px; box-sizing: border-box; background: #191C21; color: #E7E9EC; font-family: Inter, 'Noto Sans JP', system-ui, sans-serif; font-size: 13px; display: flex; flex-direction: column; border: 1px solid #2B3038; border-radius: 12px; overflow: hidden;">
+  <header style="display: flex; align-items: center; gap: 12px; padding: 16px 20px; border-bottom: 1px solid #2B3038;">
+    <h1 style="margin: 0; font-size: 16px; font-weight: 600;">OpenAPI としてエクスポート</h1>
+    <a href="Main.dc.html" aria-label="閉じる" style="margin-left: auto; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; color: #A0A8B3; text-decoration: none;">
+      <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12"></path><path d="M18 6L6 18"></path></svg>
+    </a>
+  </header>
+
+  <div style="flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: 420px minmax(0, 1fr);">
+    <div style="padding: 18px 20px; border-right: 1px solid #2B3038; display: flex; flex-direction: column; gap: 16px; overflow: auto;">
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px;">
+        <label style="display: flex; flex-direction: column; gap: 6px; color: #A0A8B3;">対象
+          <select style="height: 34px; padding: 0 10px; background: #1F232A; color: #E7E9EC; border: 1px solid #343A44; border-radius: 6px; font: inherit;"><option>ライセンス契約管理システム API</option></select>
+        </label>
+        <label style="display: flex; flex-direction: column; gap: 6px; color: #A0A8B3;">範囲
+          <select style="height: 34px; padding: 0 10px; background: #1F232A; color: #E7E9EC; border: 1px solid #343A44; border-radius: 6px; font: inherit;"><option>プロジェクト全体</option><option>選択中のフォルダ</option></select>
+        </label>
+      </div>
+
+      <fieldset style="margin: 0; padding: 0; border: 0; display: flex; flex-direction: column; gap: 8px;">
+        <legend style="padding: 0 0 8px; color: #A0A8B3;">形式</legend>
+        <sc-for list="{{formats}}" as="f" hint-placeholder-count="3">
+          <label style="{{f.style}}">
+            <input type="radio" name="fmt" checked="{{f.on}}" style="margin-top: 2px; accent-color: {{accent}};" />
+            <span style="display: flex; flex-direction: column; gap: 2px;"><span>{{f.label}}</span><span style="color: #8B939E; font-size: 12px;">{{f.sub}}</span></span>
+          </label>
+        </sc-for>
+      </fieldset>
+
+      <fieldset style="margin: 0; padding: 0; border: 0; display: flex; flex-direction: column; gap: 10px;">
+        <legend style="padding: 0 0 8px; color: #A0A8B3;">変換ルール</legend>
+        <label style="display: flex; gap: 10px; align-items: center;"><input type="checkbox" checked="{{ true }}" style="accent-color: {{accent}};" />フォルダ → tags</label>
+        <label style="display: flex; gap: 10px; align-items: center;"><input type="checkbox" checked="{{ true }}" style="accent-color: {{accent}};" />環境の baseUrl → servers</label>
+        <label style="display: flex; gap: 10px; align-items: center;"><input type="checkbox" checked="{{ true }}" style="accent-color: {{accent}};" />保存したボディ → examples</label>
+        <label style="display: flex; gap: 10px; align-items: center;"><input type="checkbox" checked="{{ true }}" style="accent-color: {{accent}};" />認証設定 → securitySchemes</label>
+        <label style="display: flex; gap: 10px; align-items: flex-start;"><input type="checkbox" checked="{{ true }}" style="margin-top: 2px; accent-color: {{accent}};" /><span style="display: flex; flex-direction: column; gap: 2px;"><span>アプリ固有の情報を x-app 拡張に残す</span><span style="color: #8B939E; font-size: 12px;">保存したパラメータの値など。再インポートで元に戻せます（正本の yaml に混ぜたくない場合は外す）</span></span></label>
+      </fieldset>
+
+      <div style="display: flex; gap: 8px; align-items: flex-start; padding: 10px 12px; border-radius: 8px; background: #1F232A; border: 1px solid #2B3038; color: #A0A8B3; font-size: 12px; line-height: 1.6;">
+        <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" style="flex: 0 0 auto; margin-top: 2px;"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg>
+        シークレットの値は書き出しません。SESSION などは securitySchemes の定義だけが出力されます。
+      </div>
+    </div>
+
+    <div style="padding: 18px 20px; display: flex; flex-direction: column; gap: 10px; min-height: 0;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <h2 style="margin: 0; font-size: 14px; font-weight: 600;">プレビュー</h2>
+        <span style="color: #8B939E;">openapi.yaml · 88 operations</span>
+        <button style="margin-left: auto; height: 28px; padding: 0 10px; border: 1px solid #343A44; border-radius: 6px; background: transparent; color: #C9CED6; font: inherit; font-size: 12px;">コピー</button>
+      </div>
+      <pre style="flex: 1 1 auto; margin: 0; padding: 14px; border: 1px solid #2B3038; border-radius: 8px; background: #16191E; font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.6; color: #C9CED6; overflow: auto;"><span style="color: #C4B5FD;">openapi</span>: 3.0.3
+<span style="color: #C4B5FD;">info</span>:
+  <span style="color: #7CC4FF;">title</span>: 日本アニメーション ライセンス契約管理システム API
+  <span style="color: #7CC4FF;">version</span>: 0.1.0
+<span style="color: #C4B5FD;">servers</span>:
+  - <span style="color: #7CC4FF;">url</span>: <span style="color: #9BDB8A;">http://localhost:8080</span>
+    <span style="color: #7CC4FF;">description</span>: ローカル (Dev Container)
+<span style="color: #C4B5FD;">security</span>:
+  - <span style="color: #7CC4FF;">cookieAuth</span>: []
+<span style="color: #C4B5FD;">tags</span>:
+  - <span style="color: #7CC4FF;">name</span>: video-client
+  - <span style="color: #7CC4FF;">name</span>: auth
+<span style="color: #C4B5FD;">paths</span>:
+  <span style="color: #7CC4FF;">/api/v1/video/clients</span>:
+    <span style="color: #7CC4FF;">get</span>:
+      <span style="color: #7CC4FF;">tags</span>: [video-client]
+      <span style="color: #7CC4FF;">operationId</span>: getClientList
+      <span style="color: #7CC4FF;">summary</span>: 取引先一覧取得
+      <span style="color: #7CC4FF;">parameters</span>:
+        - <span style="color: #7CC4FF;">name</span>: q
+          <span style="color: #7CC4FF;">in</span>: query
+          <span style="color: #7CC4FF;">schema</span>:
+            <span style="color: #7CC4FF;">type</span>: string
+      <span style="color: #7CC4FF;">x-app</span>:
+        <span style="color: #7CC4FF;">savedValues</span>:
+          <span style="color: #7CC4FF;">q</span>: Netflix
+          <span style="color: #7CC4FF;">perPage</span>: <span style="color: #F5B95A;">20</span>
+<span style="color: #C4B5FD;">components</span>:
+  <span style="color: #7CC4FF;">securitySchemes</span>:
+    <span style="color: #7CC4FF;">cookieAuth</span>:
+      <span style="color: #7CC4FF;">type</span>: apiKey
+      <span style="color: #7CC4FF;">in</span>: cookie
+      <span style="color: #7CC4FF;">name</span>: SESSION</pre>
+    </div>
+  </div>
+
+  <footer style="display: flex; align-items: center; gap: 12px; padding: 14px 20px; border-top: 1px solid #2B3038; background: #16191E;">
+    <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A0A8B3" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"></path><path d="M7 10l5 5 5-5"></path><path d="M5 21h14"></path></svg>
+    <span style="color: #A0A8B3;">インポートは OpenAPI ファイルから行います。x-app 拡張があれば設定も復元されます。</span>
+    <a href="OpenApiImport.dc.html" style="color: #C4B5FD; text-decoration: none;">インポートへ</a>
+    <a href="Main.dc.html" style="margin-left: auto; height: 36px; display: inline-flex; align-items: center; padding: 0 16px; border: 1px solid #343A44; border-radius: 8px; color: #E7E9EC; text-decoration: none;">キャンセル</a>
+    <button style="height: 36px; padding: 0 18px; border: 0; border-radius: 8px; background: {{accent}}; color: #121418; font: inherit; font-weight: 600;">YAML を保存…</button>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#A78BFA","options":["#A78BFA","#B794FF","#C4B5FD","#9F7AEA"]},"$preview":{"width":960,"height":760}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var accent = this.props.accent ?? '#A78BFA';
+    var fmt = function (label, sub, on) {
+      return { label: label, sub: sub, on: !!on, style: 'display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 8px; background: #1F232A; border: 1px solid ' + (on ? accent : '#343A44') + ';' };
+    };
+    return {
+      accent: accent,
+      formats: [
+        fmt('OpenAPI 3.0.3（YAML）', '取り込み元と同じ版（OpenAPI Generator・orval が読む版）', true),
+        fmt('OpenAPI 3.0.3（JSON）', 'ツール連携向け'),
+        fmt('OpenAPI 3.2（YAML）', '新しい版で書き出す。3.0 向けの生成ツールでは読めない場合あり')
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>リクエスト ボディ</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;family=Noto+Sans+JP:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#121418}
+a{color:#E7E9EC}a:hover{color:#FFFFFF}
+</style>
+</helmet>
+<div style="width: 760px; height: 640px; box-sizing: border-box; background: #121418; color: #E7E9EC; font-family: Inter, 'Noto Sans JP', system-ui, sans-serif; font-size: 13px; display: flex; flex-direction: column; border: 1px solid #2B3038; border-radius: 12px; overflow: hidden;">
+  <div style="padding: 14px 16px; display: flex; gap: 8px; border-bottom: 1px solid #2B3038;">
+    <div style="flex: 1 1 auto; display: flex; height: 38px; border: 1px solid #343A44; border-radius: 8px; background: #1A1D23; overflow: hidden;">
+      <span style="width: 80px; display: inline-flex; align-items: center; padding: 0 12px; background: #1F232A; border-right: 1px solid #343A44; color: #F5A524; font-family: 'JetBrains Mono', monospace; font-weight: 500;">POST</span>
+      <input aria-label="リクエストURL" value="{{url}}" style="flex: 1 1 auto; min-width: 0; background: transparent; border: 0; color: #E7E9EC; padding: 0 12px; font-family: 'JetBrains Mono', monospace; font-size: 13px;" />
+    </div>
+    <button style="height: 38px; padding: 0 22px; border: 0; border-radius: 8px; background: {{accent}}; color: #121418; font: inherit; font-weight: 600;">送信</button>
+  </div>
+  <div role="tablist" aria-label="リクエスト設定" style="display: flex; gap: 18px; padding: 0 16px; border-bottom: 1px solid #2B3038;">
+    <a href="Main.dc.html" role="tab" aria-selected="false" style="height: 38px; box-sizing: border-box; display: inline-flex; align-items: center; border-bottom: 2px solid transparent; color: #A0A8B3; text-decoration: none;">パラメータ</a>
+    <a href="RequestHeaders.dc.html" role="tab" aria-selected="false" style="height: 38px; box-sizing: border-box; display: inline-flex; align-items: center; border-bottom: 2px solid transparent; color: #A0A8B3; text-decoration: none;">ヘッダー (1)</a>
+    <span role="tab" aria-selected="true" style="height: 38px; box-sizing: border-box; display: inline-flex; align-items: center; border-bottom: 2px solid {{accent}}; font-weight: 500;">ボディ</span>
+    <a href="RequestAuth.dc.html" role="tab" aria-selected="false" style="height: 38px; box-sizing: border-box; display: inline-flex; align-items: center; border-bottom: 2px solid transparent; color: #A0A8B3; text-decoration: none;">認証</a>
+    <a href="RequestDesign.dc.html" role="tab" aria-selected="false" style="height: 38px; box-sizing: border-box; display: inline-flex; align-items: center; border-bottom: 2px solid transparent; color: #A0A8B3; text-decoration: none;">設計</a>
+  </div>
+
+  <div style="flex: 1 1 auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; min-height: 0;">
+    <div role="radiogroup" aria-label="ボディの種類" style="display: flex; flex-wrap: wrap; gap: 4px; padding: 3px; border: 1px solid #2B3038; border-radius: 8px; background: #16191E; align-self: flex-start;">
+      <sc-for list="{{types}}" as="t" hint-placeholder-count="6">
+        <button role="radio" aria-checked="{{t.checked}}" style="{{t.style}}">{{t.label}}</button>
+      </sc-for>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <span style="color: #8B939E; font-size: 12px;">Content-Type: application/json</span>
+      <button style="margin-left: auto; height: 28px; padding: 0 10px; border: 1px solid #343A44; border-radius: 6px; background: transparent; color: #C9CED6; font: inherit; font-size: 12px;">スキーマから例を生成</button>
+      <button style="height: 28px; padding: 0 10px; border: 1px solid #343A44; border-radius: 6px; background: transparent; color: #C9CED6; font: inherit; font-size: 12px;">整形</button>
+    </div>
+
+    <div style="flex: 1 1 auto; display: flex; border: 1px solid #2B3038; border-radius: 8px; background: #16191E; overflow: hidden; font-family: 'JetBrains Mono', monospace; font-size: 12.5px; line-height: 1.7;">
+      <pre aria-hidden="true" style="margin: 0; padding: 12px 10px; color: #5C6470; text-align: right; background: #14171B; border-right: 1px solid #2B3038;">1
+2
+3
+4</pre>
+      <pre style="margin: 0; padding: 12px 14px; color: #C9CED6; flex: 1 1 auto;">{
+  <span style="color: #7CC4FF;">"email"</span>: <span style="color: #C4B5FD;">"{{emailVar}}"</span>,
+  <span style="color: #7CC4FF;">"password"</span>: <span style="color: #C4B5FD;">"{{passwordVar}}"</span>
+}</pre>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: 8px; background: #1A1D23; border: 1px solid #2B3038; font-size: 12px;">
+      <div style="display: flex; gap: 8px; align-items: center; color: #6FE0A6;"><span aria-hidden="true">✓</span>スキーマ PasswordLoginRequest に適合しています（email: 1〜254 文字、password: 1〜72 文字）</div>
+      <div style="display: flex; gap: 8px; align-items: center; color: #A0A8B3;"><span aria-hidden="true" style="color: #C4B5FD;">{ }</span>紫の値は送信時に環境変数で置き換えられます（password はシークレットとしてキーチェーンから読み込み）</div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#A78BFA","options":["#A78BFA","#B794FF","#C4B5FD","#9F7AEA"]},"$preview":{"width":760,"height":640}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var v = function (s) { return '{' + '{' + s + '}' + '}'; };
+    var labels = ['なし', 'JSON', 'フォーム', 'multipart', 'テキスト', 'バイナリ'];
+    var types = labels.map(function (l) {
+      var on = l === 'JSON';
+      return {
+        label: l,
+        checked: on ? 'true' : 'false',
+        style: 'height: 28px; padding: 0 12px; border: 0; border-radius: 6px; font: inherit; font-size: 12px; background: ' + (on ? '#2A2540' : 'transparent') + '; color: ' + (on ? '#E4DBFF' : '#A0A8B3') + ';'
+      };
+    });
+    return {
+      accent: this.props.accent ?? '#A78BFA',
+      url: v('baseUrl') + '/api/v1/auth/password-login',
+      emailVar: v('email'),
+      passwordVar: v('password'),
+      types: types
+    };
+  }
+}
+</script>
+</body>
+</html>

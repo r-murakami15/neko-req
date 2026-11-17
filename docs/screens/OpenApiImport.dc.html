@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>OpenAPI取り込み</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;family=Noto+Sans+JP:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#121418}
+a{color:#E7E9EC}a:hover{color:#FFFFFF}
+</style>
+</helmet>
+<div style="width: 960px; height: 760px; box-sizing: border-box; background: #191C21; color: #E7E9EC; font-family: Inter, 'Noto Sans JP', system-ui, sans-serif; font-size: 13px; display: flex; flex-direction: column; border: 1px solid #2B3038; border-radius: 12px; overflow: hidden;">
+  <header style="display: flex; align-items: center; gap: 12px; padding: 16px 20px; border-bottom: 1px solid #2B3038;">
+    <h1 style="margin: 0; font-size: 16px; font-weight: 600;">OpenAPIから取り込み</h1>
+    <ol style="margin: 0 0 0 auto; padding: 0; list-style: none; display: flex; gap: 6px; align-items: center; color: #8B939E; font-size: 12px;">
+      <li style="display: flex; align-items: center; gap: 6px;"><span style="width: 20px; height: 20px; border-radius: 50%; background: #143525; color: #6FE0A6; display: inline-flex; align-items: center; justify-content: center; font-size: 11px;">✓</span>ファイル選択</li>
+      <li aria-hidden="true" style="width: 20px; height: 1px; background: #343A44;"></li>
+      <li style="display: flex; align-items: center; gap: 6px; color: #E7E9EC;"><span style="width: 20px; height: 20px; border-radius: 50%; background: {{accent}}; color: #121418; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600;">2</span>内容の確認</li>
+      <li aria-hidden="true" style="width: 20px; height: 1px; background: #343A44;"></li>
+      <li style="display: flex; align-items: center; gap: 6px;"><span style="width: 20px; height: 20px; border-radius: 50%; border: 1px solid #343A44; display: inline-flex; align-items: center; justify-content: center; font-size: 11px;">3</span>取り込み</li>
+    </ol>
+    <a href="Main.dc.html" aria-label="閉じる" style="width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; color: #A0A8B3; text-decoration: none;">
+      <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12"></path><path d="M18 6L6 18"></path></svg>
+    </a>
+  </header>
+
+  <div style="flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: 380px minmax(0, 1fr);">
+    <div style="padding: 18px 20px; border-right: 1px solid #2B3038; display: flex; flex-direction: column; gap: 16px; overflow: auto;">
+      <div style="display: flex; align-items: center; gap: 10px; padding: 12px; background: #1F232A; border: 1px solid #2B3038; border-radius: 8px;">
+        <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#A0A8B3" stroke-width="1.8" stroke-linejoin="round" style="flex: 0 0 auto;"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><path d="M14 3v6h6"></path></svg>
+        <div style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px;">
+          <span style="font-family: 'JetBrains Mono', monospace;">openapi.bundled.yaml</span>
+          <span style="color: #8B939E; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">486 KB · ~/working_dir/nippon-animation-license-management</span>
+        </div>
+        <button style="height: 30px; padding: 0 12px; border: 1px solid #343A44; border-radius: 6px; background: transparent; color: #E7E9EC; font: inherit;">変更</button>
+      </div>
+
+      <dl style="margin: 0; display: grid; grid-template-columns: 96px minmax(0, 1fr); row-gap: 10px; column-gap: 12px;">
+        <dt style="color: #8B939E;">タイトル</dt><dd style="margin: 0;">日本アニメーション ライセンス契約管理システム API</dd>
+        <dt style="color: #8B939E;">APIバージョン</dt><dd style="margin: 0;">0.1.0</dd>
+        <dt style="color: #8B939E;">OpenAPI</dt><dd style="margin: 0;"><span style="display: inline-flex; height: 20px; align-items: center; padding: 0 8px; border-radius: 4px; background: #2A2340; color: #CDB5FF; font-family: 'JetBrains Mono', monospace; font-size: 12px;">3.0.3</span></dd>
+        <dt style="color: #8B939E;">参照</dt><dd style="margin: 0;">bundle 済み（外部ファイルの $ref なし）</dd>
+        <dt style="color: #8B939E;">既定の認証</dt><dd style="margin: 0; font-family: 'JetBrains Mono', monospace; font-size: 12px;">cookieAuth（Cookie: SESSION）</dd>
+      </dl>
+
+      <fieldset style="margin: 0; padding: 0; border: 0; display: flex; flex-direction: column; gap: 8px;">
+        <legend style="padding: 0 0 8px; color: #A0A8B3; font-size: 12px;">servers → 環境として作成</legend>
+        <label style="display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid #343A44; border-radius: 8px; background: #1F232A;">
+          <input type="checkbox" checked="{{ true }}" style="margin-top: 2px; accent-color: {{accent}};" />
+          <span style="display: flex; flex-direction: column; gap: 2px;"><span>ローカル (Dev Container)</span><span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #8B939E;">http://localhost:8080</span></span>
+        </label>
+      </fieldset>
+
+      <fieldset style="margin: 0; padding: 0; border: 0; display: flex; flex-direction: column; gap: 10px;">
+        <legend style="padding: 0 0 8px; color: #A0A8B3; font-size: 12px;">変換オプション</legend>
+        <label style="display: flex; gap: 10px; align-items: center;"><input type="checkbox" checked="{{ true }}" style="accent-color: {{accent}};" />タグごとにフォルダを作る</label>
+        <label style="display: flex; gap: 10px; align-items: center;"><input type="checkbox" checked="{{ true }}" style="accent-color: {{accent}};" />example からボディとパラメータを埋める</label>
+        <label style="display: flex; gap: 10px; align-items: center;"><input type="checkbox" checked="{{ true }}" style="accent-color: {{accent}};" />cookieAuth を認証設定に反映する</label>
+        <label style="display: flex; gap: 10px; align-items: center;"><input type="checkbox" checked="{{ true }}" style="accent-color: {{accent}};" />description を設計タブのドキュメントにする</label>
+      </fieldset>
+    </div>
+
+    <div style="padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; min-height: 0;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <h2 style="margin: 0; font-size: 14px; font-weight: 600;">取り込むリクエスト</h2>
+        <span style="color: #8B939E;">88 / 88 件を選択中 · タグ 19</span>
+        <button style="margin-left: auto; height: 28px; padding: 0 10px; border: 1px solid #343A44; border-radius: 6px; background: transparent; color: #C9CED6; font: inherit; font-size: 12px;">すべて解除</button>
+      </div>
+      <div style="flex: 1 1 auto; min-height: 0; overflow: auto; border: 1px solid #2B3038; border-radius: 8px; background: #16191E; padding: 6px;">
+        <sc-for list="{{groups}}" as="g" hint-placeholder-count="5">
+          <div style="display: flex; flex-direction: column;">
+            <label style="display: flex; align-items: center; gap: 10px; height: 32px; padding: 0 8px; font-weight: 500;">
+              <input type="checkbox" checked="{{ true }}" style="accent-color: {{accent}};" />
+              <span aria-hidden="true" style="width: 10px; color: #8B939E; font-weight: 400;">{{g.chevron}}</span>
+              {{g.name}}
+              <span style="color: #8B939E; font-weight: 400; font-size: 12px;">{{g.note}}</span>
+            </label>
+            <sc-for list="{{g.ops}}" as="o" hint-placeholder-count="3">
+              <label style="display: flex; align-items: center; gap: 10px; min-height: 30px; padding: 0 8px 0 46px;">
+                <input type="checkbox" checked="{{ true }}" style="accent-color: {{accent}};" />
+                <span style="{{o.mStyle}}">{{o.m}}</span>
+                <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #C9CED6; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{o.path}}</span>
+                <span style="color: #8B939E; font-size: 12px; white-space: nowrap;">{{o.summary}}</span>
+                <sc-if value="{{o.badge}}" hint-placeholder-val="{{ false }}">
+                  <span style="margin-left: auto; height: 20px; display: inline-flex; align-items: center; padding: 0 7px; border-radius: 4px; background: #143525; color: #6FE0A6; font-size: 11px; white-space: nowrap;">{{o.badge}}</span>
+                </sc-if>
+              </label>
+            </sc-for>
+          </div>
+        </sc-for>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: 8px; background: #1F232A; border: 1px solid #2B3038; color: #C9CED6; font-size: 12px;">
+        <div style="display: flex; gap: 8px; align-items: center;"><span aria-hidden="true" style="color: #6FE0A6;">✓</span>operationId 88 件はすべて一意です</div>
+        <div style="display: flex; gap: 8px; align-items: center;"><span aria-hidden="true" style="color: #6FE0A6;">✓</span>security: [] の 6 件は「認証なし」として取り込みます</div>
+        <div style="display: flex; gap: 8px; align-items: center;"><span aria-hidden="true" style="color: #C4B5FD;">i</span>description に Markdown の表がある 73 件は、設計タブで表として表示します</div>
+      </div>
+    </div>
+  </div>
+
+  <footer style="display: flex; align-items: center; gap: 10px; padding: 14px 20px; border-top: 1px solid #2B3038; background: #16191E;">
+    <label style="display: flex; align-items: center; gap: 8px; color: #A0A8B3;">取り込み先
+      <select style="height: 34px; padding: 0 10px; background: #1F232A; color: #E7E9EC; border: 1px solid #2B3038; border-radius: 6px; font: inherit;">
+        <option>新規プロジェクトを作成</option>
+        <option>既存プロジェクトに統合（差分更新）</option>
+      </select>
+    </label>
+    <a href="Main.dc.html" style="margin-left: auto; height: 36px; display: inline-flex; align-items: center; padding: 0 16px; border: 1px solid #343A44; border-radius: 8px; color: #E7E9EC; text-decoration: none;">戻る</a>
+    <a href="RequestDesign.dc.html" style="height: 36px; display: inline-flex; align-items: center; padding: 0 18px; border-radius: 8px; background: {{accent}}; color: #121418; font-weight: 600; text-decoration: none;">88 件を取り込む</a>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#A78BFA","options":["#A78BFA","#B794FF","#C4B5FD","#9F7AEA"]},"$preview":{"width":960,"height":760}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var colors = { GET: '#4FC98E', POST: '#F5A524', PUT: '#5AA9FF', DELETE: '#FF7A7A' };
+    var op = function (m, path, summary, badge) {
+      return {
+        m: m, path: path, summary: summary, badge: badge || '',
+        mStyle: 'width: 50px; flex: 0 0 50px; font-family: "JetBrains Mono", monospace; font-size: 11px; font-weight: 500; color: ' + colors[m] + ';'
+      };
+    };
+    var g = function (name, note, ops) { return { name: name, note: note, chevron: ops.length ? '▾' : '▸', ops: ops }; };
+    return {
+      accent: this.props.accent ?? '#A78BFA',
+      groups: [
+        g('auth', '11 件', [
+          op('GET', '/api/v1/auth/session', 'ログイン状態取得', '認証なし'),
+          op('DELETE', '/api/v1/auth/session', 'ログアウト'),
+          op('POST', '/api/v1/auth/password-login', 'パスワードログイン (1 段階目)', '認証なし'),
+          op('POST', '/api/v1/auth/email-code-login', 'メール認証コードログイン (2 段階目)', '認証なし')
+        ]),
+        g('video-client', '3 件', [
+          op('GET', '/api/v1/video/clients', '取引先一覧取得'),
+          op('POST', '/api/v1/video/clients', '取引先登録'),
+          op('DELETE', '/api/v1/video/clients/{clientId}', '取引先削除')
+        ]),
+        g('video-invoice', '12 件', []),
+        g('video-payout', '8 件', []),
+        g('video-work', '6 件', []),
+        g('video-client-detail', '6 件', []),
+        g('kikaku-category', '5 件', []),
+        g('ほか 12 タグ', '37 件', [])
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

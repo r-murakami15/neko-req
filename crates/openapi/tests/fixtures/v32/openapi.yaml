@@ -1,0 +1,26 @@
+openapi: 3.2.0
+info:
+  title: V32
+  version: "1"
+paths:
+  /search:
+    query:
+      operationId: searchThings
+      summary: QUERY メソッド
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                q:
+                  type: string
+      responses:
+        "200":
+          description: ok
+    additionalOperations:
+      COPY:
+        operationId: copyThing
+        responses:
+          "200":
+            description: ok

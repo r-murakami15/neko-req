@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>レスポンス ヘッダー</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;family=Noto+Sans+JP:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#121418}
+a{color:#E7E9EC}a:hover{color:#FFFFFF}
+</style>
+</helmet>
+<div style="width: 760px; height: 640px; box-sizing: border-box; background: #121418; color: #E7E9EC; font-family: Inter, 'Noto Sans JP', system-ui, sans-serif; font-size: 13px; display: flex; flex-direction: column; border: 1px solid #2B3038; border-radius: 12px; overflow: hidden;">
+  <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 14px; padding: 0 16px; min-height: 44px; border-bottom: 1px solid #2B3038;">
+    <span style="display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 4px; background: #143525; color: #6FE0A6; font-weight: 600; font-family: 'JetBrains Mono', monospace; font-size: 12px;">200 OK</span>
+    <span style="color: #A0A8B3;">38 ms</span>
+    <span style="color: #A0A8B3;">1.4 KB</span>
+    <div role="tablist" aria-label="レスポンス表示" style="margin-left: auto; display: flex; gap: 16px;">
+      <a href="Main.dc.html" role="tab" aria-selected="false" style="height: 44px; box-sizing: border-box; display: inline-flex; align-items: center; border-bottom: 2px solid transparent; color: #A0A8B3; text-decoration: none;">ボディ</a>
+      <span role="tab" aria-selected="true" style="height: 44px; box-sizing: border-box; display: inline-flex; align-items: center; border-bottom: 2px solid {{accent}}; font-weight: 500;">ヘッダー (8)</span>
+      <a href="ResponseTiming.dc.html" role="tab" aria-selected="false" style="height: 44px; box-sizing: border-box; display: inline-flex; align-items: center; border-bottom: 2px solid transparent; color: #A0A8B3; text-decoration: none;">タイミング</a>
+    </div>
+  </div>
+
+  <div style="flex: 1 1 auto; padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+    <div style="display: flex; gap: 8px; align-items: center;">
+      <label style="flex: 1 1 auto; display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; background: #1F232A; border: 1px solid #2B3038; border-radius: 6px; color: #8B939E;">
+        <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+        <input aria-label="ヘッダーを絞り込み" placeholder="ヘッダーを絞り込み" style="flex: 1 1 auto; min-width: 0; background: transparent; border: 0; color: #E7E9EC; font: inherit;" />
+      </label>
+      <button style="height: 32px; padding: 0 12px; border: 1px solid #343A44; border-radius: 6px; background: transparent; color: #C9CED6; font: inherit; font-size: 12px;">すべてコピー</button>
+    </div>
+    <div style="border: 1px solid #2B3038; border-radius: 8px; overflow: hidden;">
+      <table style="width: 100%; border-collapse: collapse;">
+        <thead>
+          <tr style="background: #1A1D23; color: #A0A8B3; font-size: 12px; text-align: left;">
+            <th style="width: 220px; padding: 8px 12px; font-weight: 500;">名前</th>
+            <th style="padding: 8px 12px; font-weight: 500;">値</th>
+          </tr>
+        </thead>
+        <tbody>
+          <sc-for list="{{rows}}" as="h" hint-placeholder-count="8">
+            <tr style="border-top: 1px solid #2B3038;">
+              <td style="padding: 9px 12px; font-family: 'JetBrains Mono', monospace; color: #7CC4FF;">{{h.k}}</td>
+              <td style="padding: 9px 12px; font-family: 'JetBrains Mono', monospace; color: #C9CED6; overflow-wrap: anywhere;">{{h.v}}</td>
+            </tr>
+          </sc-for>
+        </tbody>
+      </table>
+    </div>
+    <div style="display: flex; gap: 8px; align-items: center; color: #8B939E; font-size: 12px;">
+      <span aria-hidden="true" style="color: #C4B5FD;">◆</span>XSRF-TOKEN は保持され、次の GET 以外のリクエストで X-XSRF-TOKEN ヘッダーに自動で入ります
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#A78BFA","options":["#A78BFA","#B794FF","#C4B5FD","#9F7AEA"]},"$preview":{"width":760,"height":640}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      accent: this.props.accent ?? '#A78BFA',
+      rows: [
+        { k: 'content-type', v: 'application/json' },
+        { k: 'transfer-encoding', v: 'chunked' },
+        { k: 'date', v: 'Tue, 17 Nov 2026 01:24:12 GMT' },
+        { k: 'vary', v: 'Origin, Access-Control-Request-Method, Access-Control-Request-Headers' },
+        { k: 'x-content-type-options', v: 'nosniff' },
+        { k: 'cache-control', v: 'no-cache, no-store, max-age=0, must-revalidate' },
+        { k: 'x-frame-options', v: 'DENY' },
+        { k: 'set-cookie', v: 'XSRF-TOKEN=••••; Path=/' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

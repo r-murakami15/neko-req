@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>設定</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;family=Noto+Sans+JP:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#121418}
+a{color:#E7E9EC}a:hover{color:#FFFFFF}
+</style>
+</helmet>
+<div style="width: 960px; height: 720px; box-sizing: border-box; background: #191C21; color: #E7E9EC; font-family: Inter, 'Noto Sans JP', system-ui, sans-serif; font-size: 13px; display: flex; flex-direction: column; border: 1px solid #2B3038; border-radius: 12px; overflow: hidden;">
+  <header style="display: flex; align-items: center; padding: 16px 20px; border-bottom: 1px solid #2B3038;">
+    <h1 style="margin: 0; font-size: 16px; font-weight: 600;">設定</h1>
+    <a href="Main.dc.html" aria-label="閉じる" style="margin-left: auto; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; color: #A0A8B3; text-decoration: none;">
+      <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12"></path><path d="M18 6L6 18"></path></svg>
+    </a>
+  </header>
+  <div style="flex: 1 1 auto; display: grid; grid-template-columns: 200px minmax(0, 1fr); min-height: 0;">
+    <nav aria-label="設定の項目" style="border-right: 1px solid #2B3038; padding: 12px 10px; display: flex; flex-direction: column; gap: 2px; background: #16191E;">
+      <a href="#appearance" style="height: 34px; display: flex; align-items: center; padding: 0 10px; border-radius: 6px; background: #2A2540; color: #FFFFFF; text-decoration: none;">外観</a>
+      <a href="#request" style="height: 34px; display: flex; align-items: center; padding: 0 10px; border-radius: 6px; color: #C9CED6; text-decoration: none;">リクエスト</a>
+      <a href="#proxy" style="height: 34px; display: flex; align-items: center; padding: 0 10px; border-radius: 6px; color: #C9CED6; text-decoration: none;">プロキシ・証明書</a>
+      <a href="#history" style="height: 34px; display: flex; align-items: center; padding: 0 10px; border-radius: 6px; color: #C9CED6; text-decoration: none;">履歴とデータ</a>
+      <a href="#keys" style="height: 34px; display: flex; align-items: center; padding: 0 10px; border-radius: 6px; color: #C9CED6; text-decoration: none;">ショートカット</a>
+      <a href="#about" style="height: 34px; display: flex; align-items: center; padding: 0 10px; border-radius: 6px; color: #C9CED6; text-decoration: none;">このアプリについて</a>
+    </nav>
+
+    <div style="overflow: auto; padding: 4px 24px 24px;">
+      <section id="appearance" style="padding: 18px 0; border-bottom: 1px solid #2B3038; display: flex; flex-direction: column; gap: 14px;">
+        <h2 style="margin: 0; font-size: 14px; font-weight: 600;">外観</h2>
+        <div style="display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 12px; align-items: center;">
+          <span style="color: #A0A8B3;">テーマ</span>
+          <div role="radiogroup" aria-label="テーマ" style="display: flex; gap: 4px; padding: 3px; border: 1px solid #2B3038; border-radius: 8px; background: #16191E; justify-self: start;">
+            <button role="radio" aria-checked="true" style="height: 28px; padding: 0 12px; border: 0; border-radius: 6px; background: #2A2540; color: #E4DBFF; font: inherit; font-size: 12px;">ダーク</button>
+            <button role="radio" aria-checked="false" style="height: 28px; padding: 0 12px; border: 0; border-radius: 6px; background: transparent; color: #A0A8B3; font: inherit; font-size: 12px;">ライト</button>
+            <button role="radio" aria-checked="false" style="height: 28px; padding: 0 12px; border: 0; border-radius: 6px; background: transparent; color: #A0A8B3; font: inherit; font-size: 12px;">OSに合わせる</button>
+          </div>
+          <label for="lang" style="color: #A0A8B3;">言語</label>
+          <select id="lang" style="justify-self: start; height: 32px; padding: 0 10px; background: #1F232A; color: #E7E9EC; border: 1px solid #343A44; border-radius: 6px; font: inherit;"><option>日本語</option><option>English</option></select>
+          <label for="fs" style="color: #A0A8B3;">エディタの文字サイズ</label>
+          <select id="fs" style="justify-self: start; height: 32px; padding: 0 10px; background: #1F232A; color: #E7E9EC; border: 1px solid #343A44; border-radius: 6px; font: inherit;"><option>13 px</option><option>14 px</option><option>15 px</option></select>
+          <label for="restore" style="color: #A0A8B3;">起動時に前回のタブを復元</label>
+          <input id="restore" type="checkbox" role="switch" checked="{{ true }}" style="justify-self: start; width: 18px; height: 18px; accent-color: {{accent}};">
+        </div>
+      </section>
+
+      <section id="request" style="padding: 18px 0; border-bottom: 1px solid #2B3038; display: flex; flex-direction: column; gap: 14px;">
+        <h2 style="margin: 0; font-size: 14px; font-weight: 600;">リクエスト</h2>
+        <div style="display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 12px; align-items: center;">
+          <label for="to" style="color: #A0A8B3;">タイムアウト</label>
+          <span style="display: flex; align-items: center; gap: 8px;"><input id="to" value="30" style="width: 80px; height: 32px; box-sizing: border-box; padding: 0 10px; background: #1F232A; color: #E7E9EC; border: 1px solid #343A44; border-radius: 6px; font: inherit;"><span style="color: #8B939E;">秒（0 で無制限）</span></span>
+          <label for="redir" style="color: #A0A8B3;">リダイレクトを自動で追う</label>
+          <input id="redir" type="checkbox" role="switch" checked="{{ true }}" style="justify-self: start; width: 18px; height: 18px; accent-color: {{accent}};">
+          <label for="ssl" style="color: #A0A8B3;">SSL 証明書を検証する</label>
+          <input id="ssl" type="checkbox" role="switch" checked="{{ true }}" style="justify-self: start; width: 18px; height: 18px; accent-color: {{accent}};">
+          <label for="maxsize" style="color: #A0A8B3;">表示するレスポンスの上限</label>
+          <select id="maxsize" style="justify-self: start; height: 32px; padding: 0 10px; background: #1F232A; color: #E7E9EC; border: 1px solid #343A44; border-radius: 6px; font: inherit;"><option>10 MB</option><option>50 MB</option><option>無制限</option></select>
+        </div>
+      </section>
+
+      <section id="proxy" style="padding: 18px 0; border-bottom: 1px solid #2B3038; display: flex; flex-direction: column; gap: 14px;">
+        <h2 style="margin: 0; font-size: 14px; font-weight: 600;">プロキシ・証明書</h2>
+        <div style="display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 12px; align-items: center;">
+          <span style="color: #A0A8B3;">プロキシ</span>
+          <div role="radiogroup" aria-label="プロキシ" style="display: flex; gap: 16px;">
+            <label style="display: flex; gap: 6px; align-items: center;"><input type="radio" name="px" checked="{{ true }}" style="accent-color: {{accent}};">OSの設定を使う</label>
+            <label style="display: flex; gap: 6px; align-items: center;"><input type="radio" name="px" style="accent-color: {{accent}};">使わない</label>
+            <label style="display: flex; gap: 6px; align-items: center;"><input type="radio" name="px" style="accent-color: {{accent}};">手動</label>
+          </div>
+          <span style="color: #A0A8B3;">CA 証明書</span>
+          <span style="display: flex; gap: 8px; align-items: center;"><span style="color: #8B939E;">未設定</span><button style="height: 30px; padding: 0 12px; border: 1px solid #343A44; border-radius: 6px; background: transparent; color: #E7E9EC; font: inherit;">ファイルを選択</button></span>
+          <span style="color: #A0A8B3;">クライアント証明書</span>
+          <span style="display: flex; gap: 8px; align-items: center;"><span style="font-family: 'JetBrains Mono', monospace; font-size: 12px;">*.internal.example → client.p12</span><button style="height: 30px; padding: 0 12px; border: 1px solid #343A44; border-radius: 6px; background: transparent; color: #C4B5FD; font: inherit;">+ 追加</button></span>
+        </div>
+      </section>
+
+      <section id="history" style="padding: 18px 0; border-bottom: 1px solid #2B3038; display: flex; flex-direction: column; gap: 14px;">
+        <h2 style="margin: 0; font-size: 14px; font-weight: 600;">履歴とデータ</h2>
+        <div style="display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 12px; align-items: center;">
+          <label for="hmax" style="color: #A0A8B3;">保存する件数</label>
+          <select id="hmax" style="justify-self: start; height: 32px; padding: 0 10px; background: #1F232A; color: #E7E9EC; border: 1px solid #343A44; border-radius: 6px; font: inherit;"><option>1,000 件</option><option>5,000 件</option><option>保存しない</option></select>
+          <label for="hbody" style="color: #A0A8B3;">1 MB を超えるボディを省略</label>
+          <input id="hbody" type="checkbox" role="switch" checked="{{ true }}" style="justify-self: start; width: 18px; height: 18px; accent-color: {{accent}};">
+          <span style="color: #A0A8B3;">プロジェクトの既定の保存先</span>
+          <span style="display: flex; gap: 8px; align-items: center;"><span style="font-family: 'JetBrains Mono', monospace; font-size: 12px;">~/api-projects</span><button style="height: 30px; padding: 0 12px; border: 1px solid #343A44; border-radius: 6px; background: transparent; color: #E7E9EC; font: inherit;">変更</button></span>
+        </div>
+      </section>
+
+      <section id="keys" style="padding: 18px 0; border-bottom: 1px solid #2B3038; display: flex; flex-direction: column; gap: 10px;">
+        <h2 style="margin: 0; font-size: 14px; font-weight: 600;">ショートカット</h2>
+        <sc-for list="{{keys}}" as="k" hint-placeholder-count="5">
+          <div style="display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 12px; align-items: center;">
+            <span style="color: #A0A8B3;">{{k.label}}</span>
+            <span style="display: flex; gap: 8px;"><kbd style="padding: 2px 8px; border: 1px solid #343A44; border-radius: 4px; background: #1F232A; font-family: 'JetBrains Mono', monospace; font-size: 12px;">{{k.mac}}</kbd><span style="color: #8B939E;">/</span><kbd style="padding: 2px 8px; border: 1px solid #343A44; border-radius: 4px; background: #1F232A; font-family: 'JetBrains Mono', monospace; font-size: 12px;">{{k.win}}</kbd></span>
+          </div>
+        </sc-for>
+      </section>
+
+      <section id="about" style="padding: 18px 0; display: flex; flex-direction: column; gap: 8px;">
+        <h2 style="margin: 0; font-size: 14px; font-weight: 600;">このアプリについて</h2>
+        <span style="color: #A0A8B3;">[アプリ名] バージョン 0.1.0 · macOS / Windows</span>
+        <span style="display: flex; gap: 8px;"><button style="height: 30px; padding: 0 12px; border: 1px solid #343A44; border-radius: 6px; background: transparent; color: #E7E9EC; font: inherit;">アップデートを確認</button><button style="height: 30px; padding: 0 12px; border: 1px solid #343A44; border-radius: 6px; background: transparent; color: #E7E9EC; font: inherit;">ライセンス</button></span>
+      </section>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#A78BFA","options":["#A78BFA","#B794FF","#C4B5FD","#9F7AEA"]},"$preview":{"width":960,"height":720}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      accent: this.props.accent ?? '#A78BFA',
+      keys: [
+        { label: 'リクエストを送信', mac: '⌘ Enter', win: 'Ctrl Enter' },
+        { label: '保存', mac: '⌘ S', win: 'Ctrl S' },
+        { label: '新しいタブ', mac: '⌘ T', win: 'Ctrl T' },
+        { label: 'リクエストを検索', mac: '⌘ P', win: 'Ctrl P' },
+        { label: '環境を切り替え', mac: '⌘ E', win: 'Ctrl E' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

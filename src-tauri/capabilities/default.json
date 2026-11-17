@@ -1,0 +1,12 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "メインウィンドウに許す権限。自作のコマンド（project_* / request_* など）は権限なしで呼べるので、ここには送信結果のイベント（request://finished）の購読と、レスポンスのボディの保存先を選ぶ保存ダイアログと、ボディ・multipart で送るファイルを選ぶダイアログだけを置く",
+  "windows": ["main"],
+  "permissions": [
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
+    "dialog:allow-save",
+    "dialog:allow-open"
+  ]
+}

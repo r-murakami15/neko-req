@@ -1,0 +1,23 @@
+/*
+ * フォントはアプリに同梱する（CSP で外部を読まない・外部へ通信しない方針）。
+ * woff2 だけを参照する（@fontsource の css は woff も出力して大きくなるため使わない）。
+ * 日本語は Noto Sans JP、英数字は Inter、コードは JetBrains Mono。
+ */
+@font-face { font-family: "Inter"; font-style: normal; font-weight: 400; font-display: swap;
+  src: url("../../node_modules/@fontsource/inter/files/inter-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "Inter"; font-style: normal; font-weight: 500; font-display: swap;
+  src: url("../../node_modules/@fontsource/inter/files/inter-latin-500-normal.woff2") format("woff2"); }
+@font-face { font-family: "Inter"; font-style: normal; font-weight: 600; font-display: swap;
+  src: url("../../node_modules/@fontsource/inter/files/inter-latin-600-normal.woff2") format("woff2"); }
+
+@font-face { font-family: "JetBrains Mono"; font-style: normal; font-weight: 400; font-display: swap;
+  src: url("../../node_modules/@fontsource/jetbrains-mono/files/jetbrains-mono-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "JetBrains Mono"; font-style: normal; font-weight: 500; font-display: swap;
+  src: url("../../node_modules/@fontsource/jetbrains-mono/files/jetbrains-mono-latin-500-normal.woff2") format("woff2"); }
+
+@font-face { font-family: "Noto Sans JP"; font-style: normal; font-weight: 400; font-display: swap;
+  src: url("../../node_modules/@fontsource/noto-sans-jp/files/noto-sans-jp-japanese-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "Noto Sans JP"; font-style: normal; font-weight: 500; font-display: swap;
+  src: url("../../node_modules/@fontsource/noto-sans-jp/files/noto-sans-jp-japanese-500-normal.woff2") format("woff2"); }
+@font-face { font-family: "Noto Sans JP"; font-style: normal; font-weight: 700; font-display: swap;
+  src: url("../../node_modules/@fontsource/noto-sans-jp/files/noto-sans-jp-japanese-700-normal.woff2") format("woff2"); }

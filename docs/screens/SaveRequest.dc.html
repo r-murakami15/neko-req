@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>リクエストを保存</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;family=Noto+Sans+JP:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#121418}
+a{color:#E7E9EC}a:hover{color:#FFFFFF}
+</style>
+</helmet>
+<div style="width: 560px; height: 500px; box-sizing: border-box; background: #191C21; color: #E7E9EC; font-family: Inter, 'Noto Sans JP', system-ui, sans-serif; font-size: 13px; display: flex; flex-direction: column; border: 1px solid #2B3038; border-radius: 12px; overflow: hidden;">
+  <header style="display: flex; align-items: center; padding: 16px 20px; border-bottom: 1px solid #2B3038;">
+    <h1 style="margin: 0; font-size: 16px; font-weight: 600;">リクエストを保存</h1>
+    <a href="Main.dc.html" aria-label="閉じる" style="margin-left: auto; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; color: #A0A8B3; text-decoration: none;">
+      <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12"></path><path d="M18 6L6 18"></path></svg>
+    </a>
+  </header>
+  <div style="flex: 1 1 auto; padding: 18px 20px; display: flex; flex-direction: column; gap: 14px;">
+    <label style="display: flex; flex-direction: column; gap: 6px; color: #A0A8B3;">名前
+      <input value="取引先一覧取得（Netflix で検索）" style="height: 36px; box-sizing: border-box; padding: 0 12px; border: 1px solid {{accent}}; border-radius: 8px; background: #1A1D23; color: #E7E9EC; font: inherit;" />
+    </label>
+    <div style="display: flex; flex-direction: column; gap: 6px;">
+      <span style="color: #A0A8B3;">保存先フォルダ</span>
+      <div role="listbox" aria-label="保存先フォルダ" style="border: 1px solid #2B3038; border-radius: 8px; background: #16191E; padding: 4px;">
+        <sc-for list="{{folders}}" as="f" hint-placeholder-count="5">
+          <div role="option" aria-selected="{{f.sel}}" style="{{f.style}}">
+            <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8B939E" stroke-width="1.8" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
+            {{f.name}}
+          </div>
+        </sc-for>
+      </div>
+      <button style="align-self: flex-start; height: 28px; padding: 0 10px; border: 0; background: transparent; color: #C4B5FD; font: inherit; font-size: 12px;">+ 新しいフォルダ</button>
+    </div>
+    <label style="display: flex; flex-direction: column; gap: 6px; color: #A0A8B3;">説明（任意）
+      <textarea rows="2" placeholder="このリクエストの用途など（OpenAPI の description とは別に保存）" style="padding: 8px 12px; border: 1px solid #343A44; border-radius: 8px; background: #1A1D23; color: #E7E9EC; font: inherit; resize: none;"></textarea>
+    </label>
+    <div style="color: #8B939E; font-size: 12px; font-family: 'JetBrains Mono', monospace;">→ requests/video-client/get-client-list.toml</div>
+  </div>
+  <footer style="display: flex; justify-content: flex-end; gap: 8px; padding: 14px 20px; border-top: 1px solid #2B3038; background: #16191E;">
+    <a href="Main.dc.html" style="height: 36px; display: inline-flex; align-items: center; padding: 0 16px; border: 1px solid #343A44; border-radius: 8px; color: #E7E9EC; text-decoration: none;">キャンセル</a>
+    <a href="Main.dc.html" style="height: 36px; display: inline-flex; align-items: center; padding: 0 18px; border-radius: 8px; background: {{accent}}; color: #121418; font-weight: 600; text-decoration: none;">保存</a>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#A78BFA","options":["#A78BFA","#B794FF","#C4B5FD","#9F7AEA"]},"$preview":{"width":560,"height":500}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var mk = function (name, depth, sel) {
+      return { name: name, sel: sel ? 'true' : 'false', style: 'display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 10px 0 ' + (10 + depth * 18) + 'px; border-radius: 6px; color: ' + (sel ? '#FFFFFF' : '#C9CED6') + '; background: ' + (sel ? '#2A2540' : 'transparent') + ';' };
+    };
+    return {
+      accent: this.props.accent ?? '#A78BFA',
+      folders: [mk('ライセンス契約管理システム API', 0), mk('auth', 1), mk('video-client', 1, true), mk('video-client-detail', 1), mk('video-contract', 1)]
+    };
+  }
+}
+</script>
+</body>
+</html>

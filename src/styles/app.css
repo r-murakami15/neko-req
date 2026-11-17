@@ -1,0 +1,511 @@
+/* 画面全体のスタイル。色・フォント・余白は theme.css の変数を使う（値を直接書かない）。 */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: var(--font-size);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+button:disabled,
+select:disabled,
+input:disabled {
+  cursor: not-allowed;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* ---- 共通部品 ---- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: var(--control-h);
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-field);
+  color: var(--text);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  background: var(--bg-code);
+}
+.btn:disabled {
+  color: var(--text-faint);
+  opacity: 0.75;
+}
+.btn-icon {
+  width: var(--control-h);
+  padding: 0;
+  color: var(--text-muted);
+}
+.btn-primary {
+  border-color: transparent;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+.btn-primary:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--accent);
+  filter: brightness(1.08);
+}
+.btn-primary:disabled {
+  color: var(--accent-text);
+  opacity: 0.45;
+}
+
+.input,
+.select {
+  height: var(--control-h);
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-field);
+}
+.input {
+  height: 38px;
+  border-color: var(--border-strong);
+  background: var(--bg-code);
+}
+.input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+.input[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+
+.pending-badge {
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-active);
+  color: var(--accent);
+  font-size: 11px;
+}
+
+.logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  border-radius: 7px;
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.brand-name {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+/* ---- 作成画面・読み込み中 ---- */
+
+.welcome {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100%;
+  padding: var(--space-5);
+}
+.welcome-card {
+  width: 100%;
+  max-width: 440px;
+  padding: var(--space-5);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-panel);
+}
+.welcome-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.welcome-title {
+  margin: var(--space-4) 0 var(--space-2);
+  font-size: 20px;
+  font-weight: 700;
+}
+.welcome-lead {
+  margin: 0 0 var(--space-4);
+  color: var(--text-muted);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.form-label {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.form-error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 12px;
+}
+.form .btn-primary {
+  height: 38px;
+  margin-top: var(--space-2);
+}
+
+.center-message {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  height: 100%;
+  color: var(--text-muted);
+}
+.center-message p {
+  margin: 0;
+}
+.center-message-detail {
+  color: var(--danger);
+}
+
+/* ---- ヘッダー ---- */
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px var(--space-4);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-panel);
+}
+.brand {
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto;
+  gap: 10px;
+  min-width: 0;
+}
+.brand-sep {
+  color: var(--text-faint);
+}
+.env-select {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-muted);
+}
+
+.project-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  min-width: 0;
+  height: var(--control-h);
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  font-weight: 500;
+  cursor: pointer;
+}
+.project-switcher:hover,
+.project-switcher[data-state="open"] {
+  border-color: var(--border);
+  background: var(--bg-field);
+}
+.project-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- ドロップダウン・ダイアログ ---- */
+
+.menu {
+  z-index: 50;
+  min-width: 260px;
+  max-width: 420px;
+  padding: var(--space-1);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--bg-field);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+.menu-label {
+  padding: 6px 8px;
+  color: var(--text-subtle);
+  font-size: 12px;
+}
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 8px;
+  border-radius: var(--radius);
+  color: var(--text-sub);
+  cursor: pointer;
+  outline: none;
+  user-select: none;
+}
+.menu-item[data-highlighted] {
+  background: var(--bg-active);
+  color: var(--text-strong);
+}
+.menu-item-check {
+  display: inline-flex;
+  justify-content: center;
+  width: 14px;
+  color: var(--accent);
+}
+.menu-item-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.menu-separator {
+  height: 1px;
+  margin: var(--space-1) 0;
+  background: var(--border);
+}
+
+.dialog-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: var(--bg-overlay);
+}
+.dialog {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 41;
+  width: calc(100% - 32px);
+  max-width: 440px;
+  padding: var(--space-5);
+  transform: translate(-50%, -50%);
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  background: var(--bg-panel);
+}
+.dialog-title {
+  margin: 0 0 var(--space-2);
+  font-size: 16px;
+  font-weight: 700;
+}
+.dialog-description {
+  margin: 0 0 var(--space-4);
+  color: var(--text-muted);
+}
+.dialog-close {
+  margin-top: var(--space-2);
+  width: 100%;
+}
+
+/* ---- 本体の 2 カラム ---- */
+
+.app-body {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.sidebar {
+  display: flex;
+  flex: 0 0 var(--sidebar-w);
+  flex-direction: column;
+  gap: 10px;
+  width: var(--sidebar-w);
+  padding: 14px 10px;
+  border-right: 1px solid var(--border);
+  background: var(--bg-panel);
+  overflow-y: auto;
+}
+.sidebar-search {
+  display: flex;
+  gap: 6px;
+}
+.search-field {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  height: var(--control-h);
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-field);
+  color: var(--text-subtle);
+}
+.search-field input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  outline: none;
+}
+.sidebar-count {
+  padding: 0 var(--space-2);
+  color: var(--text-subtle);
+  font-size: 12px;
+}
+.tree-empty {
+  padding: var(--space-3);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  color: var(--text-subtle);
+  font-size: 12px;
+}
+.tree-empty p {
+  margin: 0;
+}
+.tree-empty p + p {
+  margin-top: var(--space-1);
+}
+.sidebar-links {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--control-h);
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-sub);
+  text-align: left;
+  cursor: pointer;
+}
+.nav-link:disabled {
+  color: var(--text-faint);
+}
+
+.workspace {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.tabbar {
+  display: flex;
+  align-items: stretch;
+  height: var(--tab-h);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-panel);
+  overflow-x: auto;
+}
+.urlbar {
+  padding: 14px var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+.urlbar-row {
+  display: flex;
+  gap: var(--space-2);
+}
+.url-field {
+  display: flex;
+  flex: 1 1 auto;
+  height: 38px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--bg-code);
+  overflow: hidden;
+}
+.method-select {
+  width: 96px;
+  padding: 0 10px;
+  border: 0;
+  border-right: 1px solid var(--border-strong);
+  background: var(--bg-field);
+  color: var(--method-get);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 500;
+}
+.btn-send {
+  height: 38px;
+  padding: 0 22px;
+  border-radius: var(--radius-lg);
+}
+
+.panes {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.pane {
+  display: flex;
+  flex: 1 1 50%;
+  flex-direction: column;
+  min-width: 0;
+}
+.pane-request {
+  border-right: 1px solid var(--border);
+}
+.pane-tabs {
+  display: flex;
+  gap: 18px;
+  padding: 0 var(--space-4);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+}
+.statusbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  align-items: center;
+  padding: 6px var(--space-4);
+  border-top: 1px solid var(--border);
+  background: var(--bg-panel);
+  color: var(--text-subtle);
+  font-size: 12px;
+}
+.statusbar-right {
+  margin-left: auto;
+}

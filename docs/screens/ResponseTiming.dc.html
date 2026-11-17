@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>レスポンス タイミング</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;family=Noto+Sans+JP:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#121418}
+a{color:#E7E9EC}a:hover{color:#FFFFFF}
+</style>
+</helmet>
+<div style="width: 760px; height: 640px; box-sizing: border-box; background: #121418; color: #E7E9EC; font-family: Inter, 'Noto Sans JP', system-ui, sans-serif; font-size: 13px; display: flex; flex-direction: column; border: 1px solid #2B3038; border-radius: 12px; overflow: hidden;">
+  <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 14px; padding: 0 16px; min-height: 44px; border-bottom: 1px solid #2B3038;">
+    <span style="display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 4px; background: #143525; color: #6FE0A6; font-weight: 600; font-family: 'JetBrains Mono', monospace; font-size: 12px;">200 OK</span>
+    <span style="color: #A0A8B3;">38 ms</span>
+    <span style="color: #A0A8B3;">1.4 KB</span>
+    <div role="tablist" aria-label="レスポンス表示" style="margin-left: auto; display: flex; gap: 16px;">
+      <a href="Main.dc.html" role="tab" aria-selected="false" style="height: 44px; box-sizing: border-box; display: inline-flex; align-items: center; border-bottom: 2px solid transparent; color: #A0A8B3; text-decoration: none;">ボディ</a>
+      <a href="ResponseHeaders.dc.html" role="tab" aria-selected="false" style="height: 44px; box-sizing: border-box; display: inline-flex; align-items: center; border-bottom: 2px solid transparent; color: #A0A8B3; text-decoration: none;">ヘッダー (8)</a>
+      <span role="tab" aria-selected="true" style="height: 44px; box-sizing: border-box; display: inline-flex; align-items: center; border-bottom: 2px solid {{accent}}; font-weight: 500;">タイミング</span>
+    </div>
+  </div>
+
+  <div style="flex: 1 1 auto; padding: 20px; display: flex; flex-direction: column; gap: 20px;">
+    <div style="display: flex; align-items: baseline; gap: 10px;">
+      <span style="font-size: 28px; font-weight: 600; font-family: 'JetBrains Mono', monospace;">38 ms</span>
+      <span style="color: #8B939E;">合計（localhost・新規接続）</span>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+      <sc-for list="{{phases}}" as="p" hint-placeholder-count="6">
+        <div style="display: grid; grid-template-columns: 150px 440px minmax(0, 1fr); align-items: center; gap: 12px;">
+          <span style="color: #C9CED6;">{{p.label}}</span>
+          <span style="position: relative; height: 14px; border-radius: 3px; background: #1A1D23;">
+            <span style="{{p.bar}}"></span>
+          </span>
+          <span style="font-family: 'JetBrains Mono', monospace; color: #A0A8B3; text-align: right;">{{p.msText}}</span>
+        </div>
+      </sc-for>
+    </div>
+
+    <dl style="margin: 0; display: grid; grid-template-columns: 150px minmax(0, 1fr); row-gap: 10px; column-gap: 12px; padding: 14px 16px; border: 1px solid #2B3038; border-radius: 8px; background: #16191E;">
+      <dt style="color: #8B939E;">接続先</dt><dd style="margin: 0; font-family: 'JetBrains Mono', monospace;">127.0.0.1:8080（localhost）</dd>
+      <dt style="color: #8B939E;">HTTP バージョン</dt><dd style="margin: 0;">HTTP/1.1</dd>
+      <dt style="color: #8B939E;">TLS</dt><dd style="margin: 0;">なし（http）</dd>
+      <dt style="color: #8B939E;">サーバー</dt><dd style="margin: 0;">ローカル (Dev Container)</dd>
+      <dt style="color: #8B939E;">送信 / 受信</dt><dd style="margin: 0;">318 B / 1.4 KB</dd>
+    </dl>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#A78BFA","options":["#A78BFA","#B794FF","#C4B5FD","#9F7AEA"]},"$preview":{"width":760,"height":640}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var accent = this.props.accent ?? '#A78BFA';
+    var data = [['DNS 解決', 0], ['TCP 接続', 1], ['TLS ハンドシェイク', 0], ['リクエスト送信', 1], ['応答待ち（TTFB）', 33], ['ダウンロード', 3]];
+    var total = 38, width = 440, at = 0;
+    var phases = data.map(function (d) {
+      var left = Math.round(at / total * width);
+      var w = d[1] === 0 ? 0 : Math.max(3, Math.round(d[1] / total * width));
+      at += d[1];
+      var color = d[0].indexOf('応答待ち') === 0 ? accent : '#5C6B85';
+      return { label: d[0], ms: d[1], msText: d[1] === 0 ? '—' : d[1] + ' ms', bar: 'position: absolute; top: 0; height: 14px; border-radius: 3px; left: ' + left + 'px; width: ' + w + 'px; background: ' + color + ';' };
+    });
+    return { accent: accent, phases: phases };
+  }
+}
+</script>
+</body>
+</html>

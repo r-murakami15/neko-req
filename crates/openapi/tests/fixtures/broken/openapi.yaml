@@ -1,0 +1,7 @@
+openapi: 3.0.3
+info:
+  title: Broken
+  version: "1"
+paths:
+  /a:
+    $ref: "./part.yaml#/paths/~1a"

@@ -1,0 +1,42 @@
+openapi: 3.0.3
+info:
+  title: Sample API
+  version: 1.2.3
+  description: 分割された yaml の見本
+servers:
+  - url: http://localhost:8080
+    description: ローカル
+  - url: "https://{env}.example.com"
+    description: 本番
+    variables:
+      env:
+        default: api
+security:
+  - cookieAuth: []
+tags:
+  - name: users
+    description: ユーザー
+  - name: tree
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: SESSION
+    bearerAuth:
+      type: http
+      scheme: bearer
+paths:
+  /users:
+    $ref: "./paths/users.yaml#/paths/~1users"
+  /users/{userId}:
+    $ref: "./paths/users.yaml#/paths/~1users~1{userId}"
+  /tree:
+    $ref: "./paths/tree.yaml#/paths/~1tree"
+  /health:
+    get:
+      summary: ヘルスチェック
+      security: []
+      responses:
+        "200":
+          description: ok

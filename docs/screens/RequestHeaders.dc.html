@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>リクエスト ヘッダー</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;family=Noto+Sans+JP:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#121418}
+a{color:#E7E9EC}a:hover{color:#FFFFFF}
+</style>
+</helmet>
+<div style="width: 760px; height: 640px; box-sizing: border-box; background: #121418; color: #E7E9EC; font-family: Inter, 'Noto Sans JP', system-ui, sans-serif; font-size: 13px; display: flex; flex-direction: column; border: 1px solid #2B3038; border-radius: 12px; overflow: hidden;">
+  <div style="padding: 14px 16px; display: flex; gap: 8px; border-bottom: 1px solid #2B3038;">
+    <div style="flex: 1 1 auto; display: flex; height: 38px; border: 1px solid #343A44; border-radius: 8px; background: #1A1D23; overflow: hidden;">
+      <span style="width: 80px; display: inline-flex; align-items: center; padding: 0 12px; background: #1F232A; border-right: 1px solid #343A44; color: #4FC98E; font-family: 'JetBrains Mono', monospace; font-weight: 500;">GET</span>
+      <input aria-label="リクエストURL" value="{{url}}" style="flex: 1 1 auto; min-width: 0; background: transparent; border: 0; color: #E7E9EC; padding: 0 12px; font-family: 'JetBrains Mono', monospace; font-size: 13px;" />
+    </div>
+    <button style="height: 38px; padding: 0 22px; border: 0; border-radius: 8px; background: {{accent}}; color: #121418; font: inherit; font-weight: 600;">送信</button>
+  </div>
+  <div role="tablist" aria-label="リクエスト設定" style="display: flex; gap: 18px; padding: 0 16px; border-bottom: 1px solid #2B3038;">
+    <a href="Main.dc.html" role="tab" aria-selected="false" style="height: 38px; box-sizing: border-box; display: inline-flex; align-items: center; border-bottom: 2px solid transparent; color: #A0A8B3; text-decoration: none;">パラメータ (2)</a>
+    <span role="tab" aria-selected="true" style="height: 38px; box-sizing: border-box; display: inline-flex; align-items: center; border-bottom: 2px solid {{accent}}; font-weight: 500;">ヘッダー (1)</span>
+    <a href="RequestBody.dc.html" role="tab" aria-selected="false" style="height: 38px; box-sizing: border-box; display: inline-flex; align-items: center; border-bottom: 2px solid transparent; color: #A0A8B3; text-decoration: none;">ボディ</a>
+    <a href="RequestAuth.dc.html" role="tab" aria-selected="false" style="height: 38px; box-sizing: border-box; display: inline-flex; align-items: center; border-bottom: 2px solid transparent; color: #A0A8B3; text-decoration: none;">認証</a>
+    <a href="RequestDesign.dc.html" role="tab" aria-selected="false" style="height: 38px; box-sizing: border-box; display: inline-flex; align-items: center; border-bottom: 2px solid transparent; color: #A0A8B3; text-decoration: none;">設計</a>
+  </div>
+
+  <div style="flex: 1 1 auto; padding: 16px; display: flex; flex-direction: column; gap: 14px;">
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <span style="color: #A0A8B3; font-size: 12px;">ヘッダー</span>
+      <button style="margin-left: auto; height: 28px; padding: 0 10px; border: 1px solid #343A44; border-radius: 6px; background: transparent; color: #C9CED6; font: inherit; font-size: 12px;">一括編集</button>
+      <button style="height: 28px; padding: 0 10px; border: 1px solid #343A44; border-radius: 6px; background: transparent; color: #C9CED6; font: inherit; font-size: 12px;">プリセット</button>
+    </div>
+    <div style="border: 1px solid #2B3038; border-radius: 8px; overflow: hidden;">
+      <table style="width: 100%; border-collapse: collapse;">
+        <thead>
+          <tr style="background: #1A1D23; color: #A0A8B3; font-size: 12px; text-align: left;">
+            <th style="width: 36px; padding: 8px 10px; font-weight: 500;"><span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0);">有効</span></th>
+            <th style="padding: 8px 10px; font-weight: 500;">キー</th>
+            <th style="padding: 8px 10px; font-weight: 500;">値</th>
+            <th style="padding: 8px 10px; font-weight: 500;">説明</th>
+          </tr>
+        </thead>
+        <tbody>
+          <sc-for list="{{rows}}" as="h" hint-placeholder-count="3">
+            <tr style="border-top: 1px solid #2B3038;">
+              <td style="padding: 9px 10px;"><input type="checkbox" aria-label="{{h.label}}" checked="{{h.on}}" style="accent-color: {{accent}};" /></td>
+              <td style="padding: 9px 10px; font-family: 'JetBrains Mono', monospace; color: {{h.color}};">{{h.key}}</td>
+              <td style="padding: 9px 10px; font-family: 'JetBrains Mono', monospace; color: {{h.valColor}};">{{h.val}}</td>
+              <td style="padding: 9px 10px; color: #8B939E;">{{h.desc}}</td>
+            </tr>
+          </sc-for>
+          <tr style="border-top: 1px solid #2B3038;">
+            <td style="padding: 9px 10px;"></td>
+            <td style="padding: 9px 10px; color: #6F7782;">キーを追加</td>
+            <td style="padding: 9px 10px; color: #6F7782;">値</td>
+            <td style="padding: 9px 10px;"></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 8px;">
+      <label style="display: flex; align-items: center; gap: 8px; color: #A0A8B3; font-size: 12px;"><input type="checkbox" checked="{{ true }}" style="accent-color: {{accent}};" />自動で付与されるヘッダーを表示</label>
+      <div style="border: 1px dashed #343A44; border-radius: 8px; padding: 6px 0;">
+        <sc-for list="{{auto}}" as="a" hint-placeholder-count="3">
+          <div style="display: grid; grid-template-columns: 200px minmax(0, 1fr) 160px; gap: 10px; padding: 6px 12px; font-size: 12px;">
+            <span style="font-family: 'JetBrains Mono', monospace; color: #A0A8B3;">{{a.key}}</span>
+            <span style="font-family: 'JetBrains Mono', monospace; color: #A0A8B3;">{{a.val}}</span>
+            <span style="color: #8B939E;">{{a.src}}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#A78BFA","options":["#A78BFA","#B794FF","#C4B5FD","#9F7AEA"]},"$preview":{"width":760,"height":640}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var v = function (s) { return '{' + '{' + s + '}' + '}'; };
+    return {
+      accent: this.props.accent ?? '#A78BFA',
+      url: v('baseUrl') + '/api/v1/video/clients?q=Netflix&perPage=20',
+      rows: [
+        { on: true, key: 'Accept', val: 'application/json', desc: 'JSONで受け取る', color: '#E7E9EC', valColor: '#E7E9EC', label: 'Accept を有効にする' },
+        { on: false, key: 'X-XSRF-TOKEN', val: v('xsrfToken'), desc: 'GET 以外で必要（認証タブで自動付与）', color: '#8B939E', valColor: '#8B939E', label: 'X-XSRF-TOKEN を有効にする' }
+      ],
+      auto: [
+        { key: 'Cookie', val: 'SESSION=••••••••; XSRF-TOKEN=••••••••', src: '認証タブ（cookieAuth）' },
+        { key: 'User-Agent', val: '[アプリ名]/0.1.0', src: 'アプリ既定' },
+        { key: 'Accept-Encoding', val: 'gzip, br', src: 'アプリ既定' },
+        { key: 'Host', val: 'localhost:8080', src: 'URLから' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

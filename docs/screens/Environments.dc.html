@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>環境変数</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;family=Noto+Sans+JP:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#121418}
+a{color:#E7E9EC}a:hover{color:#FFFFFF}
+</style>
+</helmet>
+<div style="width: 1200px; height: 760px; box-sizing: border-box; background: #121418; color: #E7E9EC; font-family: Inter, 'Noto Sans JP', system-ui, sans-serif; font-size: 13px; display: flex; flex-direction: column; border: 1px solid #2B3038; border-radius: 12px; overflow: hidden;">
+  <header style="display: flex; align-items: center; gap: 12px; padding: 12px 20px; border-bottom: 1px solid #2B3038; background: #16191E;">
+    <a href="Main.dc.html" style="display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; border-radius: 6px; color: #A0A8B3; text-decoration: none;">
+      <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"></path></svg>
+      戻る
+    </a>
+    <h1 style="margin: 0; font-size: 16px; font-weight: 600;">環境変数</h1>
+    <span style="color: #8B939E;">日本アニメーション ライセンス契約管理システム API</span>
+  </header>
+
+  <div style="flex: 1 1 auto; display: grid; grid-template-columns: 260px minmax(0, 1fr); min-height: 0;">
+    <nav aria-label="環境の一覧" style="border-right: 1px solid #2B3038; background: #16191E; padding: 14px 10px; display: flex; flex-direction: column; gap: 4px;">
+      <span style="padding: 0 8px 6px; color: #8B939E; font-size: 12px;">共通</span>
+      <button style="display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent; color: #C9CED6; font: inherit; text-align: left;">グローバル<span style="margin-left: auto; color: #8B939E; font-size: 12px;">2</span></button>
+      <span style="padding: 12px 8px 6px; color: #8B939E; font-size: 12px;">プロジェクトの環境</span>
+      <sc-for list="{{envs}}" as="e" hint-placeholder-count="3">
+        <button style="{{e.style}}">
+          <span aria-hidden="true" style="{{e.dot}}"></span>{{e.name}}
+          <span style="margin-left: auto; color: #8B939E; font-size: 12px;">{{e.count}}</span>
+        </button>
+      </sc-for>
+      <button style="margin-top: 6px; height: 34px; padding: 0 10px; border: 1px dashed #343A44; border-radius: 6px; background: transparent; color: #C4B5FD; font: inherit; text-align: left;">+ 環境を追加</button>
+      <div style="margin-top: auto; padding: 10px; border-radius: 8px; background: #1F232A; color: #8B939E; font-size: 12px; line-height: 1.6;">OpenAPI の servers から作成した環境には、取り込み元のURLが baseUrl として入ります。</div>
+    </nav>
+
+    <section aria-labelledby="env-h" style="padding: 18px 22px; display: flex; flex-direction: column; gap: 14px; min-width: 0;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <h2 id="env-h" style="margin: 0; font-size: 15px; font-weight: 600;">ローカル (Dev Container)</h2>
+        <span style="height: 20px; display: inline-flex; align-items: center; padding: 0 8px; border-radius: 4px; background: #2A2540; color: #E4DBFF; font-size: 11px;">使用中</span>
+        <button style="margin-left: auto; height: 30px; padding: 0 12px; border: 1px solid #343A44; border-radius: 6px; background: transparent; color: #C9CED6; font: inherit;">複製</button>
+        <button style="height: 30px; padding: 0 12px; border: 1px solid #343A44; border-radius: 6px; background: transparent; color: #FF9B9B; font: inherit;">削除</button>
+      </div>
+      <div style="border: 1px solid #2B3038; border-radius: 8px; overflow: hidden;">
+        <table style="width: 100%; border-collapse: collapse;">
+          <thead>
+            <tr style="background: #1A1D23; color: #A0A8B3; font-size: 12px; text-align: left;">
+              <th style="width: 36px; padding: 8px 10px; font-weight: 500;"><span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0);">有効</span></th>
+              <th style="width: 180px; padding: 8px 10px; font-weight: 500;">変数名</th>
+              <th style="padding: 8px 10px; font-weight: 500;">値</th>
+              <th style="width: 120px; padding: 8px 10px; font-weight: 500;">種類</th>
+              <th style="width: 200px; padding: 8px 10px; font-weight: 500;">説明</th>
+            </tr>
+          </thead>
+          <tbody>
+            <sc-for list="{{vars}}" as="v" hint-placeholder-count="5">
+              <tr style="border-top: 1px solid #2B3038;">
+                <td style="padding: 9px 10px;"><input type="checkbox" aria-label="{{v.label}}" checked="{{ true }}" style="accent-color: {{accent}};" /></td>
+                <td style="padding: 9px 10px; font-family: 'JetBrains Mono', monospace; color: #C4B5FD;">{{v.name}}</td>
+                <td style="padding: 9px 10px; font-family: 'JetBrains Mono', monospace; overflow-wrap: anywhere;">{{v.val}}</td>
+                <td style="padding: 9px 10px;"><span style="{{v.kindStyle}}">{{v.kind}}</span></td>
+                <td style="padding: 9px 10px; color: #8B939E;">{{v.desc}}</td>
+              </tr>
+            </sc-for>
+            <tr style="border-top: 1px solid #2B3038;">
+              <td style="padding: 9px 10px;"></td>
+              <td style="padding: 9px 10px; color: #6F7782;">変数を追加</td>
+              <td style="padding: 9px 10px;"></td><td style="padding: 9px 10px;"></td><td style="padding: 9px 10px;"></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div style="display: flex; gap: 8px; align-items: center; color: #8B939E; font-size: 12px;">
+        <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg>
+        シークレットの値はOSのキーチェーンに保存されます。プロジェクトファイルとエクスポートには変数名だけが残ります。
+      </div>
+      <div style="display: flex; gap: 12px; padding: 12px 14px; border: 1px solid #2B3038; border-radius: 8px; background: #16191E; font-size: 12px; color: #A0A8B3;">
+        <span>優先順位:</span>
+        <span>リクエスト内の上書き</span><span aria-hidden="true">›</span>
+        <span style="color: #E4DBFF;">選択中の環境</span><span aria-hidden="true">›</span>
+        <span>グローバル</span>
+      </div>
+      <div style="margin-top: auto; display: flex; justify-content: flex-end; gap: 8px;">
+        <a href="Main.dc.html" style="height: 36px; display: inline-flex; align-items: center; padding: 0 16px; border: 1px solid #343A44; border-radius: 8px; color: #E7E9EC; text-decoration: none;">破棄</a>
+        <a href="Main.dc.html" style="height: 36px; display: inline-flex; align-items: center; padding: 0 18px; border-radius: 8px; background: {{accent}}; color: #121418; font-weight: 600; text-decoration: none;">保存</a>
+      </div>
+    </section>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#A78BFA","options":["#A78BFA","#B794FF","#C4B5FD","#9F7AEA"]},"$preview":{"width":1200,"height":760}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var env = function (name, count, color, sel) {
+      return {
+        name: name, count: count,
+        dot: 'width: 8px; height: 8px; border-radius: 50%; background: ' + color + ';',
+        style: 'display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 10px; border: 0; border-radius: 6px; font: inherit; text-align: left; color: ' + (sel ? '#FFFFFF' : '#C9CED6') + '; background: ' + (sel ? '#2A2540' : 'transparent') + ';'
+      };
+    };
+    var kind = function (secret) {
+      return secret
+        ? 'height: 20px; display: inline-flex; align-items: center; padding: 0 8px; border-radius: 4px; background: #3A2A1A; color: #F5C27A; font-size: 11px;'
+        : 'height: 20px; display: inline-flex; align-items: center; padding: 0 8px; border-radius: 4px; background: #23272F; color: #A0A8B3; font-size: 11px;';
+    };
+    return {
+      accent: this.props.accent ?? '#A78BFA',
+      envs: [env('ローカル (Dev Container)', 6, '#4FC98E', true)],
+      vars: [
+        { name: 'baseUrl', val: 'http://localhost:8080', kind: '通常', kindStyle: kind(false), desc: 'servers から作成', label: 'baseUrl を有効にする' },
+        { name: 'session', val: '••••••••••••••••', kind: 'シークレット', kindStyle: kind(true), desc: 'cookieAuth（SESSION）。ログインで自動更新', label: 'session を有効にする' },
+        { name: 'xsrfToken', val: '••••••••', kind: 'シークレット', kindStyle: kind(true), desc: 'XSRF-TOKEN Cookie から自動取得', label: 'xsrfToken を有効にする' },
+        { name: 'email', val: 'user@example.com', kind: '通常', kindStyle: kind(false), desc: 'ログインの 1 段階目で使用', label: 'email を有効にする' },
+        { name: 'password', val: '••••••••', kind: 'シークレット', kindStyle: kind(true), desc: 'ログインの 1 段階目で使用', label: 'password を有効にする' },
+        { name: 'clientId', val: '1', kind: '通常', kindStyle: kind(false), desc: '取引先詳細などのテスト用', label: 'clientId を有効にする' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

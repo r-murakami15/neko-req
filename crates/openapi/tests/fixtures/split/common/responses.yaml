@@ -1,0 +1,8 @@
+components:
+  responses:
+    NotFound:
+      description: 見つからない
+      content:
+        application/problem+json:
+          schema:
+            $ref: "./schemas.yaml#/components/schemas/Problem"

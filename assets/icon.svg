@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <rect width="1024" height="1024" rx="224" fill="#16191E"/>
+  <!-- 耳 -->
+  <path d="M214 480 L246 196 L462 336 Z" fill="#A78BFA"/>
+  <path d="M810 480 L778 196 L562 336 Z" fill="#A78BFA"/>
+  <path d="M276 400 L292 280 L384 342 Z" fill="#7C5CD6"/>
+  <path d="M748 400 L732 280 L640 342 Z" fill="#7C5CD6"/>
+  <!-- 顔 -->
+  <ellipse cx="512" cy="580" rx="312" ry="262" fill="#A78BFA"/>
+  <!-- 目 -->
+  <ellipse cx="400" cy="556" rx="38" ry="56" fill="#121418"/>
+  <ellipse cx="624" cy="556" rx="38" ry="56" fill="#121418"/>
+  <circle cx="413" cy="534" r="12" fill="#E7E9EC"/>
+  <circle cx="637" cy="534" r="12" fill="#E7E9EC"/>
+  <!-- 鼻と口 -->
+  <path d="M478 640 L546 640 L512 682 Z" fill="#121418"/>
+  <path d="M512 682 Q512 736 458 742 M512 682 Q512 736 566 742" fill="none" stroke="#121418" stroke-width="16" stroke-linecap="round"/>
+  <!-- ひげ -->
+  <path d="M290 650 L170 624 M290 692 L176 714 M734 650 L854 624 M734 692 L848 714" fill="none" stroke="#121418" stroke-width="14" stroke-linecap="round"/>
+</svg>

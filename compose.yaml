@@ -1,0 +1,35 @@
+# 開発コンテナ。使い方は docs/09-development.md を参照
+#   起動:   docker compose up -d --build workspace
+#   実行:   docker compose exec workspace bash -c '<コマンド>'
+services:
+  workspace:
+    build:
+      context: ./docker
+    image: neko-req-workspace:latest
+    working_dir: /work
+    command: sleep infinity
+    environment:
+      SDKROOT: /opt/macos-sdk/MacOSX.sdk
+      # 実際の API 定義（分割 yaml 25 ファイル / bundle 済み）を結合テストの入力に使う。無ければテストはスキップ
+      NEKOREQ_FIXTURE_DIR: /fixtures/license-api
+      NEKOREQ_FIXTURE_BUNDLED: /fixtures/openapi.bundled.yaml
+    ports:
+      - "1420:1420"   # vite（画面だけをブラウザで確認）
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # ホストで動く API（localhost:8080）へ
+    volumes:
+      - .:/work
+      # ビルド成果物・依存キャッシュ・node_modules はホストと分けて名前付きボリュームに置く
+      - cargo-target:/cargo-target
+      - cargo-registry:/usr/local/cargo/registry
+      - cargo-git:/usr/local/cargo/git
+      - node-modules:/work/node_modules
+      - macos-sdk:/opt/macos-sdk
+      - ../nippon-animation-license-management/docs/20_design/api:/fixtures/license-api:ro
+      - ../nippon-animation-license-management/openapi.bundled.yaml:/fixtures/openapi.bundled.yaml:ro
+volumes:
+  cargo-target:
+  cargo-registry:
+  cargo-git:
+  node-modules:
+  macos-sdk:

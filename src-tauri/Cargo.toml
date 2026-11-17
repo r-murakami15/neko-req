@@ -1,0 +1,44 @@
+[package]
+name = "nekoreq"
+version.workspace = true
+description = "OpenAPI の yaml を正本にした API クライアント"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+name = "nekoreq_lib"
+path = "src/lib.rs"
+
+[[bin]]
+name = "nekoreq"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { workspace = true }
+
+[dependencies]
+nekoreq-core = { workspace = true }
+nekoreq-http = { workspace = true }
+nekoreq-openapi = { workspace = true }
+nekoreq-secrets = { workspace = true }
+nekoreq-storage = { workspace = true }
+bytes = { workspace = true }
+chrono = { workspace = true }
+tauri = { workspace = true }
+tauri-plugin-dialog = { workspace = true }
+tauri-plugin-opener = { workspace = true }
+tauri-specta = { workspace = true }
+specta = { workspace = true }
+specta-typescript = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+uuid = { workspace = true }
+wiremock = { workspace = true }
+zip = { workspace = true }

@@ -1,0 +1,13 @@
+paths:
+  /tree:
+    get:
+      tags: [tree]
+      operationId: getTree
+      summary: 循環するスキーマ
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "../common/schemas.yaml#/components/schemas/Node"

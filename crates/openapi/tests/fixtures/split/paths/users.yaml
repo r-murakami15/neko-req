@@ -1,0 +1,99 @@
+paths:
+  /users:
+    get:
+      tags: [users]
+      operationId: listUsers
+      summary: ユーザー一覧
+      description: |
+        ユーザーを返す。
+
+        返すエラー:
+        | status | code | 状況 |
+        | --- | --- | --- |
+        | 404 | NOT_FOUND | 見つからない |
+      parameters:
+        - name: q
+          in: query
+          description: 名前の部分一致
+          schema:
+            type: string
+          example: foo
+        - $ref: "#/components/parameters/Page"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserList"
+        "404":
+          $ref: "../common/responses.yaml#/components/responses/NotFound"
+    post:
+      tags: [users]
+      operationId: createUser
+      summary: ユーザー作成
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "../common/schemas.yaml#/components/schemas/UserInput"
+      responses:
+        "201":
+          description: created
+  /users/{userId}:
+    parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [users]
+      operationId: getUser
+      summary: ユーザー取得
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          description: オペレーション側の説明
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "../common/schemas.yaml#/components/schemas/User"
+        "404":
+          $ref: "../common/responses.yaml#/components/responses/NotFound"
+    delete:
+      tags: [users]
+      summary: ユーザー削除 (operationId なし)
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: deleted
+components:
+  parameters:
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        default: 1
+        minimum: 1
+  schemas:
+    UserList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "../common/schemas.yaml#/components/schemas/User"
+        total:
+          type: integer

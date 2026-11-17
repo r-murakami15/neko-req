@@ -1,0 +1,7 @@
+openapi: 3.0.3
+info:
+  title: Multi
+  version: "1"
+paths:
+  /a:
+    $ref: "./paths/a.yaml#/paths/~1a"

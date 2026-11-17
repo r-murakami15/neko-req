@@ -1,0 +1,7 @@
+paths:
+  /a:
+    get:
+      operationId: getA
+      responses:
+        "200":
+          description: ok

@@ -1,0 +1,87 @@
+[workspace]
+resolver = "2"
+members = [
+    "src-tauri",
+    "crates/core",
+    "crates/http",
+    "crates/openapi",
+    "crates/storage",
+    "crates/secrets",
+    "crates/curl",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+license = "MIT"
+publish = false
+
+[workspace.dependencies]
+# 内部クレート
+nekoreq-core = { path = "crates/core" }
+nekoreq-http = { path = "crates/http" }
+nekoreq-openapi = { path = "crates/openapi" }
+nekoreq-storage = { path = "crates/storage" }
+nekoreq-secrets = { path = "crates/secrets" }
+nekoreq-curl = { path = "crates/curl" }
+
+# 共通
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+thiserror = "2"
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+rusqlite = { version = "0.43", features = ["bundled"] }
+tempfile = "3"
+base64 = "0.23"
+url = "2"
+percent-encoding = "2"
+bytes = "1"
+
+# 通信（http クレート）
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync", "fs", "net", "io-util"] }
+tokio-util = "0.7"
+# レスポンスの展開（gzip・deflate・br）と文字コードの変換。reqwest の自動展開は使わない
+flate2 = "1"
+brotli = "9"
+encoding_rs = "0.8"
+# rustls は ring で使う（aws-lc は C のビルド道具が増えるため）。システムの証明書ストアで検証する
+reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider", "http2"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+rustls-platform-verifier = ">=0.6, <0.8"
+tower-layer = "0.3"
+tower-service = "0.3"
+
+# キーチェーン（Linux は kernel keyring のみ。ビルドが通ればよく、実行では使わない）
+keyring = { version = "3", features = ["apple-native", "windows-native", "linux-native"] }
+
+# テスト用
+wiremock = "0.6"
+rcgen = "0.14"
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12"] }
+
+# TypeScript の型の自動生成（互いに合う版を「=」で固定する）
+specta = { version = "=2.0.0-rc.22", features = ["derive", "serde_json"] }
+specta-typescript = "=0.0.9"
+tauri-specta = { version = "=2.0.0-rc.21", features = ["derive", "typescript"] }
+
+# OpenAPI の取り込み（openapi クレート）。saphyr は位置つきの YAML パーサー
+saphyr = "0.3"
+sha2 = "0.10"
+zip = { version = "7", default-features = false, features = ["deflate-flate2"] }
+# テスト用（roas は bundle 済みの fixture を別のパーサーで読んで突き合わせるのにだけ使う）
+roas = { version = "0.22", default-features = false, features = ["v3_0"] }
+
+# Tauri
+tauri = { version = "2", features = [] }
+tauri-build = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-opener = "2"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true

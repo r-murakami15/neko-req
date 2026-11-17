@@ -1,0 +1,58 @@
+components:
+  schemas:
+    User:
+      allOf:
+        - $ref: "#/components/schemas/Base"
+        - type: object
+          required: [name]
+          properties:
+            name:
+              type: string
+              minLength: 1
+              maxLength: 50
+              example: 太郎
+            email:
+              type: string
+              format: email
+              nullable: true
+            status:
+              $ref: "#/components/schemas/Status"
+    Base:
+      type: object
+      required: [id]
+      properties:
+        id:
+          type: integer
+          readOnly: true
+          example: 1
+    Status:
+      type: string
+      enum: [ACTIVE, INACTIVE]
+    UserInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        status:
+          $ref: "#/components/schemas/Status"
+    Node:
+      type: object
+      properties:
+        name:
+          type: string
+        child:
+          $ref: "#/components/schemas/Node"
+        children:
+          type: array
+          items:
+            $ref: "#/components/schemas/Node"
+    Problem:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+          example: NOT_FOUND
+        detail:
+          type: string
