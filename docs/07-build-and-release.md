@@ -81,12 +81,14 @@ docker compose exec workspace bash -c 'mkdir -p .tauri-keys && npx tauri signer 
 
 ## 置き換える値
 
-自動更新の設定は `src-tauri/tauri.conf.json` の `plugins.updater` にある。リポジトリを作るまで、次の 2 つは仮の値のままになっている。
+自動更新の設定は `src-tauri/tauri.conf.json` の `plugins.updater` にある。2026-11-18 に次のとおり設定した（v0.1.0 から有効）。
 
-| 場所 | 仮の値 | 置き換え先 |
-| --- | --- | --- |
-| `plugins.updater.endpoints[0]` | `https://github.com/OWNER/REPO/releases/latest/download/latest.json` | `OWNER` と `REPO` を実際のリポジトリに |
-| `plugins.updater.pubkey` | `REPLACE_WITH_UPDATER_PUBLIC_KEY` | `nekoreq-updater.key.pub` の中身（1 行の文字列）をそのまま |
+| 場所 | 値 |
+| --- | --- |
+| `plugins.updater.endpoints[0]` | `https://github.com/r-murakami15/neko-req/releases/latest/download/latest.json` |
+| `plugins.updater.pubkey` | `nekoreq-updater.key.pub` の中身（1 行の文字列） |
+
+鍵を作り直したときは `pubkey` を書き換え、Secrets も入れ替える。秘密鍵をなくすと、すでに配った版へ次の更新を配れなくなる（新しい鍵で署名した更新は、古い公開鍵を持つ版では検証に失敗する）。秘密鍵とパスワードは、リポジトリの外（パスワード管理ソフトなど）に必ず控えておく。
 
 仮の値のままでもアプリは起動する。起動時の確認が失敗するだけで、画面には何も出さず、標準エラーに `[updater] ...` と記録する。置き換えたら、**その設定を入れた版を最初に配る**必要がある（それより前の版は、更新先を知らないので自動では更新されない）。
 
@@ -126,8 +128,7 @@ ad-hoc 署名は版ごとに変わるため、初回と更新後の最初の起�
 
 ## ユーザーが手でやること
 
-1. GitHub にリポジトリを作る（公開）。
-2. `tauri.conf.json` の `OWNER/REPO` を置き換える。
-3. updater の鍵を作る（上記）。公開鍵を `pubkey` に書き、秘密鍵とパスワードを GitHub の Secrets に登録する。
-4. 版を上げてタグを push し、Actions が作った下書きを確かめて公開する。
-5. 別の Mac と Windows に入れ、初回起動の許可を通して動くことを確かめる。次の版を公開して、起動時に更新されることを確かめる。
+1. GitHub にリポジトリを作る（公開）。済: r-murakami15/neko-req。
+2. updater の鍵を作り、公開鍵を `pubkey` に書く。済（2026-11-18）。秘密鍵とパスワードを GitHub の Secrets に登録し、リポジトリの外に控える。
+3. 版を上げてタグを push し、Actions が作った下書きを確かめて公開する。
+4. 別の Mac と Windows に入れ、初回起動の許可を通して動くことを確かめる。次の版を公開して、起動時に更新されることを確かめる。

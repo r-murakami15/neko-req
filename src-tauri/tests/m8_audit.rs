@@ -2905,11 +2905,8 @@ fn updater_endpoint_has_no_credentials_and_the_webview_cannot_call_the_updater()
     );
 }
 
-/// リリースの前に置き換える値が残っていないか（まだ置き換えていないので、今は失敗する）。
+/// リリースの前に置き換える値（pubkey = REPLACE_WITH_UPDATER_PUBLIC_KEY、endpoint = OWNER/REPO）が残っていないか。
 #[test]
-// 置き換え値（pubkey = REPLACE_WITH_UPDATER_PUBLIC_KEY、endpoint = OWNER/REPO）は公開前にユーザーが入れるもの。
-// 入れるまで自動更新の確認はすべて失敗するので、今は ignore にしてある。
-#[ignore = "RELEASE: 公開前に docs/07 の置き換え値を入れる"]
 fn updater_config_has_no_placeholders_left() {
     let conf = tauri_conf();
     let updater = &conf["plugins"]["updater"];
