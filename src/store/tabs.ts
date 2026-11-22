@@ -187,6 +187,8 @@ interface TabsState {
   saveDialogTabId: string | null;
   /** 「未保存のまま閉じる？」を確認中のタブ。 */
   closeConfirmTabId: string | null;
+  /** 「まとめて閉じる」で、未保存のタブがあるので確認中のタブ（閉じる対象の全部。確認が要らなければ `null`）。 */
+  closeManyConfirm: string[] | null;
   /** 前回のタブの復元が済んだプロジェクト（済むまでは、タブの状態を保存しない）。 */
   restored: Record<string, boolean>;
 
@@ -205,6 +207,11 @@ interface TabsState {
   /** 同期のあとなどに、タブの yaml 側の情報だけを更新する（入力した内容は変えない）。 */
   setOpInfo: (tabId: string, op: OpTabInfo) => void;
   markDraftSaved: (tabId: string, saved: RequestDraft, base: { name: string; spec: RequestSpec }) => void;
+  /**
+   * タブを複製する: 同じ入力の「未保存の新しいタブ」（`adhocId` は `null`・名前は「<名前> のコピー」）を、元の右隣に開いて前面にする。
+   * yaml の API のタブは複製しない（`null` を返す。理由は docs/02-implementation-notes.md）。
+   */
+  duplicate: (tabId: string) => string | null;
   activate: (projectId: string, tabId: string) => void;
   close: (tabId: string) => void;
   patch: (tabId: string, patch: TabPatch) => void;
@@ -212,6 +219,7 @@ interface TabsState {
   markSaved: (tabId: string, saved: AdHocRequest) => void;
   setSaveDialogTab: (tabId: string | null) => void;
   setCloseConfirmTab: (tabId: string | null) => void;
+  setCloseManyConfirm: (tabIds: string[] | null) => void;
   setSend: (tabId: string, update: (s: SendState) => SendState) => void;
   reset: () => void;
 }
@@ -224,6 +232,7 @@ export const useTabsStore = create<TabsState>()((set, get) => ({
   activeByProject: {},
   saveDialogTabId: null,
   closeConfirmTabId: null,
+  closeManyConfirm: null,
   restored: {},
 
   openSeed: (projectId, seed) => {
@@ -290,6 +299,30 @@ export const useTabsStore = create<TabsState>()((set, get) => ({
       })),
     })),
 
+  duplicate: (tabId) => {
+    const src = get().tabs.find((t) => t.id === tabId);
+    if (!src || src.op) return null;
+    // 保存していない新しいタブ: 保存した時点の内容は空のリクエストにして、閉じるときは確認が出るようにする
+    const copy = tabFromSeed(src.projectId, {
+      name: `${src.name} のコピー`,
+      spec: JSON.parse(JSON.stringify(src.spec)) as RequestSpec,
+      baseName: NEW_REQUEST_NAME,
+      baseSpec: emptySpec(),
+      requestPane: src.requestPane,
+      responsePane: src.responsePane,
+      bodyMode: src.bodyMode,
+    });
+    copy.bodyStash = { ...src.bodyStash };
+    copy.authStash = { ...src.authStash };
+    set((s) => {
+      const at = s.tabs.findIndex((t) => t.id === tabId);
+      const tabs = [...s.tabs];
+      tabs.splice(at + 1, 0, copy);
+      return { tabs, activeByProject: { ...s.activeByProject, [src.projectId]: copy.id } };
+    });
+    return copy.id;
+  },
+
   activate: (projectId, tabId) => set((s) => ({ activeByProject: { ...s.activeByProject, [projectId]: tabId } })),
 
   close: (tabId) =>
@@ -329,10 +362,11 @@ export const useTabsStore = create<TabsState>()((set, get) => ({
 
   setSaveDialogTab: (tabId) => set({ saveDialogTabId: tabId }),
   setCloseConfirmTab: (tabId) => set({ closeConfirmTabId: tabId }),
+  setCloseManyConfirm: (tabIds) => set({ closeManyConfirm: tabIds }),
 
   setSend: (tabId, update) => set((s) => ({ tabs: mapTab(s.tabs, tabId, (t) => ({ ...t, send: update(t.send) })) })),
 
-  reset: () => set({ tabs: [], activeByProject: {}, saveDialogTabId: null, closeConfirmTabId: null, restored: {} }),
+  reset: () => set({ tabs: [], activeByProject: {}, saveDialogTabId: null, closeConfirmTabId: null, closeManyConfirm: null, restored: {} }),
 }));
 
 /** プロジェクトの前面のタブ（なければ先頭）。 */

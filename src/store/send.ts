@@ -137,6 +137,22 @@ export function closeTab(backend: Backend, tabId: string, force = false) {
 }
 
 /**
+ * タブをまとめて閉じる（他を閉じる・右側を閉じる・すべて閉じる）。未保存のタブが 1 つでもあれば（`force` でなければ）、
+ * 確認ダイアログを 1 回だけ出す（`closeManyConfirm`）。確認で「保存せずに閉じる」を選ぶと `force` で呼び直す。
+ * 送信中のタブは止めてから閉じる。前面のタブは、1 枚ずつ左から閉じたときの `close` の規則に従う。
+ */
+export function closeTabs(backend: Backend, tabIds: string[], force = false) {
+  const state = useTabsStore.getState();
+  const targets = state.tabs.filter((t) => tabIds.includes(t.id));
+  if (targets.length === 0) return;
+  if (!force && targets.some(isDirty)) {
+    state.setCloseManyConfirm(targets.map((t) => t.id));
+    return;
+  }
+  for (const t of targets) closeTab(backend, t.id, true);
+}
+
+/**
  * 履歴の「再送信」: 元の入力をタブとして開き、そのタブで送信の結果を受け取る。
  * 送る前にタブを作って購読しておくので、結果が先に届いても取りこぼさない。
  */

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import { errorMessage, useBackend } from "../api";
 import { useEnvironments, useOperationDetail, usePreview, useSaveDraft, useSaveTab } from "../api/queries";
 import type { Body, Project, RequestSpec } from "../bindings";
-import { copyText } from "../lib/clipboard";
+import { copyCurlOfTab, requestInputOf } from "../lib/curl";
 import { PARAM_IN_LABEL } from "../lib/opkey";
 import { countActive, emptyRequiredParams, METHODS, type ParamMeta, specForSend } from "../lib/spec";
 import { describeLocation, indexUnresolved, type Section, splitVars } from "../lib/vars";
@@ -33,7 +33,8 @@ export function RequestEditor({ project, tab }: { project: Project; tab: Request
   const saveTab = useSaveTab();
   const saveDraft = useSaveDraft();
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [curlMessage, setCurlMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  // cURL をコピーした結果の知らせ（タブの右クリックメニューからコピーしたぶんもここに出る）
+  const curlMessage = useUiStore((s) => (s.curlNotice?.tabId === tab.id ? s.curlNotice : null));
   const [rawConfirmOpen, setRawConfirmOpen] = useState(false);
   const dismissDropped = useTabsStore((s) => s.dismissDropped);
   const responseOpen = useUiStore((s) => s.responseOpen);
@@ -71,24 +72,11 @@ export function RequestEditor({ project, tab }: { project: Project; tab: Request
 
   const send = () => {
     if (!canSend) return;
-    void sendTab(backend, tab.id, { projectId: project.id, environmentId: null, request: sendSpec, overrides: [], opKey }, envName);
+    void sendTab(backend, tab.id, requestInputOf(tab), envName);
   };
 
   /** 今のリクエストを cURL にしてコピーする。既定は秘密を伏せる。`raw` は秘密の値がそのまま入る。 */
-  const copyCurl = async (mode: "redacted" | "raw") => {
-    setCurlMessage(null);
-    try {
-      const text = await backend.curlExport({ projectId: project.id, environmentId: null, request: sendSpec, overrides: [], opKey }, mode);
-      const ok = await copyText(text);
-      setCurlMessage(
-        ok
-          ? { ok: true, text: mode === "raw" ? "cURL をコピーしました（秘密の値を含みます）" : "cURL をコピーしました（秘密の値は伏せています）" }
-          : { ok: false, text: "クリップボードにコピーできませんでした" },
-      );
-    } catch (e) {
-      setCurlMessage({ ok: false, text: `cURL にできませんでした: ${errorMessage(e)}` });
-    }
-  };
+  const copyCurl = (mode: "redacted" | "raw") => copyCurlOfTab(backend, tab, mode);
 
   const save = () => {
     setSaveError(null);
@@ -103,6 +91,15 @@ export function RequestEditor({ project, tab }: { project: Project; tab: Request
     }
     saveTab.mutate({ tab }, { onError: (e) => setSaveError(errorMessage(e)) });
   };
+
+  // この画面を離れたら、cURL の知らせは消す
+  useEffect(
+    () => () => {
+      const ui = useUiStore.getState();
+      if (ui.curlNotice?.tabId === tab.id) ui.setCurlNotice(null);
+    },
+    [tab.id],
+  );
 
   // ショートカット（送信・保存）が、前面のリクエストの最新の操作を呼べるようにする
   const latest = useRef({ send, save });

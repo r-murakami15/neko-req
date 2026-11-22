@@ -300,6 +300,18 @@ input:disabled {
   background: var(--bg-active);
   color: var(--text-strong);
 }
+.menu-item[data-disabled] {
+  color: var(--text-subtle);
+  opacity: 0.55;
+  cursor: default;
+}
+.menu-item-shortcut {
+  margin-left: auto;
+  padding-left: var(--space-4, 16px);
+  color: var(--text-subtle);
+  font-size: 12px;
+  white-space: nowrap;
+}
 .menu-item-check {
   display: inline-flex;
   justify-content: center;
@@ -484,7 +496,20 @@ input:disabled {
   height: var(--tab-h);
   border-bottom: 1px solid var(--border);
   background: var(--bg-panel);
+}
+/* タブの領域。入りきらない分はここだけ横にスクロールする（バーは見せない）。＋は外に置いて右端に残す */
+.tablist {
+  position: relative;
+  display: flex;
+  flex: 0 1 auto;
+  align-items: stretch;
+  min-width: 0;
   overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+.tablist::-webkit-scrollbar {
+  display: none;
 }
 .urlbar {
   padding: 14px var(--space-4);

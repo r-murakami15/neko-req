@@ -100,6 +100,15 @@ interface UiState {
   /** 開いたばかりの空のタブで、URL 欄にフォーカスを入れる（そのタブの画面が出たら使う）。覚えない。 */
   focusUrlTabId: string | null;
   setFocusUrlTabId: (tabId: string | null) => void;
+  /** サイドバーの検索欄の入力（タブの右クリックメニューが「ツリーで表示」を出せるか調べるために共有する）。覚えない。 */
+  treeQuery: string;
+  setTreeQuery: (query: string) => void;
+  /** 「ツリーで表示」の頼み。`nonce` が変わるたびに、サイドバーが行を含むフォルダを開いて行までスクロールする。覚えない。 */
+  revealRequest: { key: string; nonce: number } | null;
+  requestReveal: (key: string) => void;
+  /** cURL をコピーした結果の知らせ（そのタブの画面の上に出す。画面を離れたら消える）。覚えない。 */
+  curlNotice: { tabId: string; ok: boolean; text: string } | null;
+  setCurlNotice: (notice: { tabId: string; ok: boolean; text: string } | null) => void;
 }
 
 export const useUiStore = create<UiState>()(
@@ -135,6 +144,12 @@ export const useUiStore = create<UiState>()(
         }),
       focusUrlTabId: null,
       setFocusUrlTabId: (tabId) => set({ focusUrlTabId: tabId }),
+      treeQuery: "",
+      setTreeQuery: (query) => set({ treeQuery: query }),
+      revealRequest: null,
+      requestReveal: (key) => set((s) => ({ revealRequest: { key, nonce: (s.revealRequest?.nonce ?? 0) + 1 } })),
+      curlNotice: null,
+      setCurlNotice: (notice) => set({ curlNotice: notice }),
     }),
     {
       name: "nekoreq-ui",

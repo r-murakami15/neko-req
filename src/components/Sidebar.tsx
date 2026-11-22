@@ -29,7 +29,9 @@ export function Sidebar({ project }: { project: Project }) {
   const setSyncDialogOpen = useUiStore((s) => s.setSyncDialogOpen);
   const setScreen = useUiStore((s) => s.setScreen);
   const { width } = useSidebarWidth();
-  const [query, setQuery] = useState("");
+  const query = useUiStore((s) => s.treeQuery);
+  const setQuery = useUiStore((s) => s.setTreeQuery);
+  const revealRequest = useUiStore((s) => s.revealRequest);
   const [expanded, setExpanded] = useState<Record<string, boolean | undefined>>({});
   const [deleting, setDeleting] = useState<AdHocRequest | null>(null);
   const [forgetting, setForgetting] = useState<OperationListItem | null>(null);
@@ -73,6 +75,20 @@ export function Sidebar({ project }: { project: Project }) {
     // 開閉の状態と同じ描画で行が増えるので、スクロールは ApiTree が、増えたあとの位置で行う
     setReveal((prev) => ({ key: activeKey, nonce: (prev?.nonce ?? 0) + 1 }));
   }, [activeKey, location]);
+
+  // タブの右クリックメニューの「ツリーで表示」: 前面のタブが変わったときの連動と違い、頼まれるたびに必ず動く
+  // （すでに前面のタブでも、手で閉じたフォルダでも開き直してスクロールする）。検索で見えない行・ツリーにない行は何もしない。
+  const handledReveal = useRef(revealRequest?.nonce ?? 0);
+  useEffect(() => {
+    if (!revealRequest || revealRequest.nonce === handledReveal.current) return;
+    handledReveal.current = revealRequest.nonce;
+    const found = locateRow(revealRequest.key, { ops, adhocs: items, query });
+    if (found.status !== "ok") return;
+    revealedKey.current = revealRequest.key;
+    const folderId = found.folderId;
+    if (folderId !== null && query.trim() === "") setExpanded((prev) => (prev[folderId] === true ? prev : { ...prev, [folderId]: true }));
+    setReveal((prev) => ({ key: revealRequest.key, nonce: (prev?.nonce ?? 0) + 1 }));
+  }, [revealRequest]);
 
   const toggle = (id: string) =>
     setExpanded((prev) => {

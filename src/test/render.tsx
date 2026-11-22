@@ -35,6 +35,9 @@ export function renderApp(backend: Backend = createMockBackend()) {
     responseRatio: 0.5,
     unseenResponses: {},
     focusUrlTabId: null,
+    treeQuery: "",
+    revealRequest: null,
+    curlNotice: null,
   });
   useTabsStore.getState().reset();
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
