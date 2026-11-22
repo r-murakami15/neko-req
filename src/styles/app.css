@@ -346,6 +346,35 @@ input:disabled {
   min-height: 0;
 }
 
+/* サイドバーと右側の境目のつまみ。幅 0 の列の上に、左右へはみ出す 8px の帯を重ねる（.sidebar は overflow: hidden なので外に置く） */
+.sidebar-resizer {
+  position: relative;
+  z-index: 3;
+  flex: 0 0 0;
+  align-self: stretch;
+  outline: none;
+  cursor: col-resize;
+  touch-action: none;
+}
+.sidebar-resizer::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -4px;
+  width: 8px;
+  background: transparent;
+  transition: background 0.12s;
+}
+.sidebar-resizer:hover::before,
+.sidebar-resizer:focus-visible::before,
+.sidebar-resizer.is-dragging::before {
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+.sidebar-resizer.is-dragging::before {
+  background: color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
 .sidebar {
   display: flex;
   flex: 0 0 var(--sidebar-w);

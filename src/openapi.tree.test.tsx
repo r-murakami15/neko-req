@@ -61,15 +61,16 @@ describe("API ツリー", () => {
     expect(await nav.findByText("11 件 · タグ 4")).toBeInTheDocument();
 
     // 最初のタグ（auth）だけ開いている
-    const auth = nav.getByRole("treeitem", { name: /^auth\s/ });
+    const auth = nav.getByRole("treeitem", { name: /^auth(\s|$)/ });
     expect(auth).toHaveAttribute("aria-expanded", "true");
-    expect(auth).toHaveTextContent("4");
+    // フォルダ内の件数は出さない
+    expect(auth).not.toHaveTextContent("4");
     expect(nav.getByRole("treeitem", { name: /ログイン状態取得/ })).toBeInTheDocument();
-    const clientFolder = nav.getByRole("treeitem", { name: /^video-client\s/ });
+    const clientFolder = nav.getByRole("treeitem", { name: /^video-client(\s|$)/ });
     expect(clientFolder).toHaveAttribute("aria-expanded", "false");
     expect(nav.queryByRole("treeitem", { name: /取引先一覧取得/ })).not.toBeInTheDocument();
     // タグなしの API は「（タグなし）」に入る
-    expect(nav.getByRole("treeitem", { name: /^（タグなし）\s/ })).toBeInTheDocument();
+    expect(nav.getByRole("treeitem", { name: /^（タグなし）(\s|$)/ })).toBeInTheDocument();
 
     await user.click(clientFolder);
     expect(clientFolder).toHaveAttribute("aria-expanded", "true");
@@ -166,7 +167,7 @@ describe("削除された API", () => {
     await user.click(footerButton(dialog, "閉じる"));
 
     const nav = within(sidebar());
-    const gone = await nav.findByRole("treeitem", { name: /^削除された API\s/ });
+    const gone = await nav.findByRole("treeitem", { name: /^削除された API(\s|$)/ });
     await user.click(gone);
     expect(await nav.findByRole("treeitem", { name: /旧ヘルスチェック$/ })).toBeInTheDocument();
     // 開いていたタブには「yaml から削除」の知らせが出る
@@ -176,7 +177,7 @@ describe("削除された API", () => {
     const confirm = await screen.findByRole("dialog", { name: "削除された API を消しますか？" });
     expect(confirm).toHaveTextContent("入力値も一緒に消えます");
     await user.click(within(confirm).getByRole("button", { name: "消す" }));
-    await waitFor(() => expect(nav.queryByRole("treeitem", { name: /^削除された API\s/ })).not.toBeInTheDocument());
+    await waitFor(() => expect(nav.queryByRole("treeitem", { name: /^削除された API(\s|$)/ })).not.toBeInTheDocument());
     expect(screen.queryByRole("tab", { name: /旧ヘルスチェック/ })).not.toBeInTheDocument();
     expect(await mock.draftGet(project.id, { kind: "id", value: "legacyPing" })).toBeNull();
   });
@@ -226,7 +227,7 @@ describe("同期", () => {
     expect(await within(sidebar()).findByText("11 件 · タグ 3")).toBeInTheDocument();
     await openFolder(user, "video-client");
     expect(await within(sidebar()).findByRole("treeitem", { name: /取引先詳細取得/ })).toBeInTheDocument();
-    expect(within(sidebar()).queryByRole("treeitem", { name: /^legacy\s/ })).not.toBeInTheDocument();
+    expect(within(sidebar()).queryByRole("treeitem", { name: /^legacy(\s|$)/ })).not.toBeInTheDocument();
     await waitFor(() => expect(within(syncButton()).queryByRole("img", { name: "変更あり" })).not.toBeInTheDocument());
   });
 

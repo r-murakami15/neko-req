@@ -186,9 +186,6 @@
 .tree-folder {
   width: 100%;
 }
-.tree-count {
-  flex: none;
-}
 
 /* ---- パラメータ・ヘッダーの表: yaml の説明 ---- */
 

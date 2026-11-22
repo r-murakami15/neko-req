@@ -13,6 +13,7 @@ import { ImportDialog } from "./components/openapi/ImportDialog";
 import { SyncDialog } from "./components/openapi/SyncDialog";
 import { SettingsDialog } from "./components/settings/SettingsDialog";
 import { Sidebar } from "./components/Sidebar";
+import { SidebarResizer } from "./components/SidebarResizer";
 import { UpdateBanner, useUpdateNotifications } from "./components/UpdateBanner";
 import { Workspace } from "./components/Workspace";
 import { applyAppearance } from "./lib/appearance";
@@ -108,6 +109,7 @@ function ProjectShell({ projects, current }: { projects: Project[]; current: Pro
             <UpdateBanner />
             <div className="app-body">
               <Sidebar project={current} />
+              <SidebarResizer />
               <Workspace project={current} />
             </div>
             <CreateProjectDialog />

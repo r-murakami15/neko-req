@@ -234,7 +234,7 @@ describe("6. API ツリーのキーボード操作（WAI-ARIA tree）", () => {
     await nav().findByText("11 件 · タグ 4");
     expect(tree()).toBeInTheDocument();
 
-    const auth = item(/^auth\s/);
+    const auth = item(/^auth(\s|$)/);
     expect(auth).toHaveAttribute("aria-level", "1");
     expect(auth).toHaveAttribute("aria-setsize", "6");
     expect(auth).toHaveAttribute("aria-posinset", "1");
@@ -244,8 +244,8 @@ describe("6. API ツリーのキーボード操作（WAI-ARIA tree）", () => {
     expect(logout).toHaveAttribute("aria-setsize", "4");
     expect(logout).toHaveAttribute("aria-posinset", "2");
     expect(logout).not.toHaveAttribute("aria-expanded");
-    expect(item(/^video-client\s/)).toHaveAttribute("aria-expanded", "false");
-    expect(item(/^video-client\s/)).toHaveAttribute("aria-posinset", "2");
+    expect(item(/^video-client(\s|$)/)).toHaveAttribute("aria-expanded", "false");
+    expect(item(/^video-client(\s|$)/)).toHaveAttribute("aria-posinset", "2");
 
     expect(items().filter((el) => el.tabIndex === 0)).toEqual([auth]);
     expect(items().filter((el) => el.tabIndex === -1)).toHaveLength(items().length - 1);
@@ -259,42 +259,42 @@ describe("6. API ツリーのキーボード操作（WAI-ARIA tree）", () => {
     await user.tab();
     await user.tab();
     await user.tab();
-    expect(item(/^auth\s/)).toHaveFocus();
+    expect(item(/^auth(\s|$)/)).toHaveFocus();
     await user.tab();
     expect(nav().getByRole("button", { name: "環境変数" })).toHaveFocus();
     // Shift+Tab で戻ると、同じ行に戻る
     await user.tab({ shift: true });
-    expect(item(/^auth\s/)).toHaveFocus();
+    expect(item(/^auth(\s|$)/)).toHaveFocus();
   });
 
   it("↑↓ で前後の行へ、Home / End で先頭・末尾へ（案内の行は飛ばす）。Tab で入る行は最後にフォーカスした行に動く", async () => {
     const { user } = await setupWithApi();
     await nav().findByText("11 件 · タグ 4");
-    act(() => item(/^auth\s/).focus());
+    act(() => item(/^auth(\s|$)/).focus());
 
     await user.keyboard("{ArrowDown}");
     expect(item(/ログイン状態取得/)).toHaveFocus();
     expect(item(/ログイン状態取得/).tabIndex).toBe(0);
-    expect(item(/^auth\s/).tabIndex).toBe(-1);
+    expect(item(/^auth(\s|$)/).tabIndex).toBe(-1);
     await user.keyboard("{ArrowDown}{ArrowDown}");
     expect(item(/パスワードログイン/)).toHaveFocus();
     await user.keyboard("{ArrowUp}");
     expect(item(/ログアウト/)).toHaveFocus();
 
     await user.keyboard("{End}");
-    expect(item(/^その他\s/)).toHaveFocus(); // 最後の行は案内の文なので、その手前のフォルダ
+    expect(item(/^その他(\s|$)/)).toHaveFocus(); // 最後の行は案内の文なので、その手前のフォルダ
     await user.keyboard("{ArrowDown}");
-    expect(item(/^その他\s/)).toHaveFocus();
+    expect(item(/^その他(\s|$)/)).toHaveFocus();
     await user.keyboard("{Home}");
-    expect(item(/^auth\s/)).toHaveFocus();
+    expect(item(/^auth(\s|$)/)).toHaveFocus();
     await user.keyboard("{ArrowUp}");
-    expect(item(/^auth\s/)).toHaveFocus();
+    expect(item(/^auth(\s|$)/)).toHaveFocus();
   });
 
   it("→ は閉じたフォルダを開き、開いたフォルダでは最初の子へ。← は開いたフォルダを閉じ、API では親のフォルダへ", async () => {
     await setupWithApi();
     await nav().findByText("11 件 · タグ 4");
-    const clients = item(/^video-client\s/);
+    const clients = item(/^video-client(\s|$)/);
     act(() => clients.focus());
 
     fireEvent.keyDown(clients, { key: "ArrowRight" });
@@ -308,28 +308,28 @@ describe("6. API ツリーのキーボード操作（WAI-ARIA tree）", () => {
     expect(item(/取引先一覧取得/)).toHaveFocus();
 
     fireEvent.keyDown(item(/取引先一覧取得/), { key: "ArrowLeft" });
-    await waitFor(() => expect(item(/^video-client\s/)).toHaveFocus());
-    expect(item(/^video-client\s/)).toHaveAttribute("aria-expanded", "true");
+    await waitFor(() => expect(item(/^video-client(\s|$)/)).toHaveFocus());
+    expect(item(/^video-client(\s|$)/)).toHaveAttribute("aria-expanded", "true");
 
-    fireEvent.keyDown(item(/^video-client\s/), { key: "ArrowLeft" });
-    expect(item(/^video-client\s/)).toHaveAttribute("aria-expanded", "false");
+    fireEvent.keyDown(item(/^video-client(\s|$)/), { key: "ArrowLeft" });
+    expect(item(/^video-client(\s|$)/)).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByRole("treeitem", { name: /取引先一覧取得/ })).not.toBeInTheDocument();
     // 閉じたフォルダで ← は何もしない
-    fireEvent.keyDown(item(/^video-client\s/), { key: "ArrowLeft" });
-    expect(item(/^video-client\s/)).toHaveFocus();
+    fireEvent.keyDown(item(/^video-client(\s|$)/), { key: "ArrowLeft" });
+    expect(item(/^video-client(\s|$)/)).toHaveFocus();
   });
 
   it("Enter と Space は、フォルダなら開閉、API ならそのリクエストをタブで開く", async () => {
     const { user } = await setupWithApi();
     await nav().findByText("11 件 · タグ 4");
 
-    act(() => item(/^video-client\s/).focus());
+    act(() => item(/^video-client(\s|$)/).focus());
     await user.keyboard("{Enter}");
-    expect(item(/^video-client\s/)).toHaveAttribute("aria-expanded", "true");
+    expect(item(/^video-client(\s|$)/)).toHaveAttribute("aria-expanded", "true");
     await user.keyboard(" ");
-    expect(item(/^video-client\s/)).toHaveAttribute("aria-expanded", "false");
+    expect(item(/^video-client(\s|$)/)).toHaveAttribute("aria-expanded", "false");
     await user.keyboard(" ");
-    expect(item(/^video-client\s/)).toHaveAttribute("aria-expanded", "true");
+    expect(item(/^video-client(\s|$)/)).toHaveAttribute("aria-expanded", "true");
 
     await user.keyboard("{ArrowDown}");
     expect(item(/取引先一覧取得/)).toHaveFocus();
@@ -363,11 +363,11 @@ describe("6. API ツリーのキーボード操作（WAI-ARIA tree）", () => {
   it("マウスのクリックはこれまでどおり（フォルダは開閉、API はタブで開く）で、クリックした行が Tab で入る行になる", async () => {
     const { user } = await setupWithApi();
     await nav().findByText("11 件 · タグ 4");
-    await user.click(item(/^video-work\s/));
-    expect(item(/^video-work\s/)).toHaveAttribute("aria-expanded", "true");
-    expect(item(/^video-work\s/)).toHaveFocus();
-    expect(item(/^video-work\s/).tabIndex).toBe(0);
-    expect(item(/^auth\s/).tabIndex).toBe(-1);
+    await user.click(item(/^video-work(\s|$)/));
+    expect(item(/^video-work(\s|$)/)).toHaveAttribute("aria-expanded", "true");
+    expect(item(/^video-work(\s|$)/)).toHaveFocus();
+    expect(item(/^video-work(\s|$)/).tabIndex).toBe(0);
+    expect(item(/^auth(\s|$)/).tabIndex).toBe(-1);
     await user.click(item(/ログアウト/));
     expect(await screen.findByRole("tab", { name: /ログアウト/ })).toBeInTheDocument();
   });
@@ -380,13 +380,13 @@ describe("6. API ツリーのキーボード操作（WAI-ARIA tree）", () => {
     // 当たったフォルダ（video-client）とその API 3 件、「その他」は当たりがないので出ない
     expect(items().map((el) => el.textContent)).toEqual([expect.stringMatching(/video-client/), expect.stringMatching(/取引先/), expect.stringMatching(/取引先/), expect.stringMatching(/取引先/)]);
 
-    act(() => item(/^video-client\s/).focus());
+    act(() => item(/^video-client(\s|$)/).focus());
     await user.keyboard("{ArrowDown}");
     expect(items()[1]).toHaveFocus();
     await user.keyboard("{End}");
     expect(items()[3]).toHaveFocus();
     await user.keyboard("{ArrowLeft}");
-    expect(item(/^video-client\s/)).toHaveFocus();
+    expect(item(/^video-client(\s|$)/)).toHaveFocus();
     await user.keyboard("{Home}{ArrowDown}{Enter}");
     expect(await screen.findByRole("tab", { name: /取引先/ })).toBeInTheDocument();
   });
@@ -424,7 +424,7 @@ describe("6. API ツリーのキーボード操作（WAI-ARIA tree）", () => {
     });
 
     // 「削除された API」を開く
-    const deleted = await nav().findByRole("treeitem", { name: /^削除された API\s/ });
+    const deleted = await nav().findByRole("treeitem", { name: /^削除された API(\s|$)/ });
     expect(deleted).toHaveAttribute("aria-expanded", "false");
     act(() => deleted.focus());
     await user.keyboard("{ArrowRight}");
@@ -433,16 +433,16 @@ describe("6. API ツリーのキーボード操作（WAI-ARIA tree）", () => {
     expect(item(/旧ヘルスチェック/)).toHaveFocus();
     expect(item(/旧ヘルスチェック/)).toHaveAttribute("aria-level", "2");
     await user.keyboard("{ArrowLeft}");
-    expect(item(/^削除された API\s/)).toHaveFocus();
+    expect(item(/^削除された API(\s|$)/)).toHaveFocus();
     await user.keyboard("{Enter}");
-    expect(item(/^削除された API\s/)).toHaveAttribute("aria-expanded", "false");
+    expect(item(/^削除された API(\s|$)/)).toHaveAttribute("aria-expanded", "false");
 
     // 「その他」: 閉じて開く
     await user.keyboard("{ArrowDown}");
-    expect(item(/^その他\s/)).toHaveFocus();
-    expect(item(/^その他\s/)).toHaveAttribute("aria-expanded", "true");
+    expect(item(/^その他(\s|$)/)).toHaveFocus();
+    expect(item(/^その他(\s|$)/)).toHaveAttribute("aria-expanded", "true");
     await user.keyboard("{ArrowLeft}");
-    expect(item(/^その他\s/)).toHaveAttribute("aria-expanded", "false");
+    expect(item(/^その他(\s|$)/)).toHaveAttribute("aria-expanded", "false");
     await user.keyboard("{ArrowRight}{ArrowRight}");
     const memo = screen.getByRole("treeitem", { name: /メモ用のリクエスト/ });
     expect(memo).toHaveFocus();
@@ -491,10 +491,10 @@ describe("6. API ツリーのキーボード操作（WAI-ARIA tree）", () => {
       expect(slots()).toBeLessThan(60);
       expect(screen.queryByRole("treeitem", { name: /^GET API 1000$/ })).not.toBeInTheDocument();
 
-      act(() => item(/^all\s/).focus());
+      act(() => item(/^all(\s|$)/).focus());
       await user.keyboard("{End}");
-      expect(item(/^その他\s/)).toHaveFocus();
-      expect(item(/^その他\s/)).toHaveAttribute("aria-posinset", "2");
+      expect(item(/^その他(\s|$)/)).toHaveFocus();
+      expect(item(/^その他(\s|$)/)).toHaveAttribute("aria-posinset", "2");
       // 末尾の近くまでスクロールを頼んでいる。DOM の行は少ないまま
       await waitFor(() => {
         const tops = scrollTo.mock.calls.map((c) => (c[0] as { top: number }).top);
@@ -502,7 +502,7 @@ describe("6. API ツリーのキーボード操作（WAI-ARIA tree）", () => {
       });
       expect(slots()).toBeLessThan(60);
       // Tab で入る行は、フォーカスのある行（遠くにあっても描かれ続ける）
-      expect(item(/^その他\s/).tabIndex).toBe(0);
+      expect(item(/^その他(\s|$)/).tabIndex).toBe(0);
 
       // 末尾から ↑ で、1000 件目の API へ（範囲外だった行が出る）
       await user.keyboard("{ArrowUp}");
@@ -510,7 +510,7 @@ describe("6. API ツリーのキーボード操作（WAI-ARIA tree）", () => {
       expect(slots()).toBeLessThan(80);
 
       await user.keyboard("{Home}");
-      expect(item(/^all\s/)).toHaveFocus();
+      expect(item(/^all(\s|$)/)).toHaveFocus();
     } finally {
       delete (HTMLElement.prototype as { scrollTo?: unknown }).scrollTo;
       delete (HTMLElement.prototype as { scrollHeight?: unknown }).scrollHeight;
@@ -538,8 +538,8 @@ describe("6. API ツリーのキーボード操作（WAI-ARIA tree）", () => {
     expect(ringed()[0]).toHaveFocus();
 
     // クリックした行にも付く。続けてキーで動けば移った先に付く
-    await user.click(item(/^video-work\s/));
-    expect(ringed()).toEqual([item(/^video-work\s/)]);
+    await user.click(item(/^video-work(\s|$)/));
+    expect(ringed()).toEqual([item(/^video-work(\s|$)/)]);
     await user.keyboard("{ArrowUp}");
     expect(ringed()).toHaveLength(1);
     expect(ringed()[0]).toHaveFocus();
@@ -564,10 +564,10 @@ describe("7. 開いているタブとツリーの連動", () => {
     await nav().findByText("11 件 · タグ 4");
     await openOp(r.user, "auth", /ログアウト/);
     await openOp(r.user, "video-client", /取引先一覧取得/);
-    await r.user.click(item(/^auth\s/));
-    await r.user.click(item(/^video-client\s/));
-    await r.user.click(item(/^その他\s/));
-    for (const name of [/^auth\s/, /^video-client\s/, /^その他\s/]) expect(item(name)).toHaveAttribute("aria-expanded", "false");
+    await r.user.click(item(/^auth(\s|$)/));
+    await r.user.click(item(/^video-client(\s|$)/));
+    await r.user.click(item(/^その他(\s|$)/));
+    for (const name of [/^auth(\s|$)/, /^video-client(\s|$)/, /^その他(\s|$)/]) expect(item(name)).toHaveAttribute("aria-expanded", "false");
     return r;
   }
 
@@ -575,20 +575,20 @@ describe("7. 開いているタブとツリーの連動", () => {
     const { user } = await openTwoAndCloseFolders();
     // ツリーにフォーカスがない間は、前面のタブ（取引先一覧取得）の行が閉じたフォルダに隠れている → フォルダの行に枠
     await user.click(tab(/ログアウト/));
-    expect(item(/^auth\s/)).toHaveAttribute("aria-expanded", "true");
+    expect(item(/^auth(\s|$)/)).toHaveAttribute("aria-expanded", "true");
     expect(item(/ログアウト/)).toHaveClass("is-active");
     expect(ringed()).toEqual([item(/ログアウト/)]);
     expect(tab(/ログアウト/)).toHaveFocus();
 
     // 別のフォルダの API へ。前のフォルダは閉じない
     await user.click(tab(/取引先一覧取得/));
-    expect(item(/^video-client\s/)).toHaveAttribute("aria-expanded", "true");
-    expect(item(/^auth\s/)).toHaveAttribute("aria-expanded", "true");
+    expect(item(/^video-client(\s|$)/)).toHaveAttribute("aria-expanded", "true");
+    expect(item(/^auth(\s|$)/)).toHaveAttribute("aria-expanded", "true");
     expect(ringed()).toEqual([item(/取引先一覧取得/)]);
     expect(tab(/取引先一覧取得/)).toHaveFocus();
 
     // タブを閉じて別のタブが前に来たときも同じ
-    await user.click(item(/^auth\s/));
+    await user.click(item(/^auth(\s|$)/));
     await user.click(screen.getByRole("button", { name: /ログアウト を閉じる/ }));
     expect(ringed()).toEqual([item(/取引先一覧取得/)]);
   });
@@ -600,11 +600,11 @@ describe("7. 開いているタブとツリーの連動", () => {
     await nav().findByText("11 件 · タグ 4");
     await user.click(await nav().findByRole("treeitem", { name: /メモ用のリクエスト/ }));
     await openOp(user, "auth", /ログアウト/);
-    await user.click(item(/^その他\s/));
-    expect(item(/^その他\s/)).toHaveAttribute("aria-expanded", "false");
+    await user.click(item(/^その他(\s|$)/));
+    expect(item(/^その他(\s|$)/)).toHaveAttribute("aria-expanded", "false");
 
     await user.click(tab(/メモ用のリクエスト/));
-    expect(item(/^その他\s/)).toHaveAttribute("aria-expanded", "true");
+    expect(item(/^その他(\s|$)/)).toHaveAttribute("aria-expanded", "true");
     expect(ringed()).toEqual([item(/メモ用のリクエスト/)]);
   });
 
@@ -614,8 +614,8 @@ describe("7. 開いているタブとツリーの連動", () => {
     expect(ringed()).toEqual([item(/ログアウト/)]);
 
     // ツリーへ入ってフォーカスを動かすと、枠はフォーカス行へ（前面のタブの行からは外れる）
-    await user.click(item(/^video-client\s/));
-    expect(ringed()).toEqual([item(/^video-client\s/)]);
+    await user.click(item(/^video-client(\s|$)/));
+    expect(ringed()).toEqual([item(/^video-client(\s|$)/)]);
     expect(item(/ログアウト/)).toHaveClass("is-active");
     await user.keyboard("{ArrowUp}");
     expect(ringed()).toHaveLength(1);
@@ -637,7 +637,7 @@ describe("7. 開いているタブとツリーの連動", () => {
     expect(items().filter((el) => el.tabIndex === 0)).toEqual([item(/ログアウト/)]);
 
     // ツリーで別の行にフォーカスしたあと、タブを切り替えると、Tab で入る行は前面のタブの行に合わせ直す
-    await user.click(item(/^video-client\s/));
+    await user.click(item(/^video-client(\s|$)/));
     await user.click(tab(/取引先一覧取得/));
     expect(items().filter((el) => el.tabIndex === 0)).toEqual([item(/取引先一覧取得/)]);
     nav().getByLabelText("API を検索").focus();
@@ -651,29 +651,29 @@ describe("7. 開いているタブとツリーの連動", () => {
   it("手でフォルダを閉じると閉じたまま（次に前面のタブが変わるまで開かない）。隠れている間はフォルダの行に枠", async () => {
     const { user } = await openTwoAndCloseFolders();
     await user.click(tab(/ログアウト/));
-    expect(item(/^auth\s/)).toHaveAttribute("aria-expanded", "true");
+    expect(item(/^auth(\s|$)/)).toHaveAttribute("aria-expanded", "true");
 
-    await user.click(item(/^auth\s/)); // 手で閉じる
+    await user.click(item(/^auth(\s|$)/)); // 手で閉じる
     await user.click(nav().getByLabelText("API を検索"));
-    expect(item(/^auth\s/)).toHaveAttribute("aria-expanded", "false");
+    expect(item(/^auth(\s|$)/)).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByRole("treeitem", { name: /ログアウト/ })).not.toBeInTheDocument();
-    expect(ringed()).toEqual([item(/^auth\s/)]);
+    expect(ringed()).toEqual([item(/^auth(\s|$)/)]);
     // 隠れていても、Tab で入る行はそのフォルダ
-    expect(items().filter((el) => el.tabIndex === 0)).toEqual([item(/^auth\s/)]);
+    expect(items().filter((el) => el.tabIndex === 0)).toEqual([item(/^auth(\s|$)/)]);
 
     // 別のタブへ切り替えて戻すと、また開く
     await user.click(tab(/取引先一覧取得/));
-    expect(item(/^auth\s/)).toHaveAttribute("aria-expanded", "false");
+    expect(item(/^auth(\s|$)/)).toHaveAttribute("aria-expanded", "false");
     await user.click(tab(/ログアウト/));
-    expect(item(/^auth\s/)).toHaveAttribute("aria-expanded", "true");
+    expect(item(/^auth(\s|$)/)).toHaveAttribute("aria-expanded", "true");
     expect(ringed()).toEqual([item(/ログアウト/)]);
   });
 
   it("検索で絞り込み中に、当たっていない行のタブへ切り替えても何も起きない（フォルダは開かず、枠もない）", async () => {
     const { user } = await openTwoAndCloseFolders();
     await user.click(tab(/ログアウト/));
-    await user.click(item(/^video-client\s/)); // video-client は開いた状態
-    await user.click(item(/^video-client\s/)); // 閉じる
+    await user.click(item(/^video-client(\s|$)/)); // video-client は開いた状態
+    await user.click(item(/^video-client(\s|$)/)); // 閉じる
     await user.type(nav().getByLabelText("API を検索"), "ログアウト");
     expect(ringed()).toEqual([item(/ログアウト/)]);
 
@@ -683,8 +683,8 @@ describe("7. 開いているタブとツリーの連動", () => {
 
     // 検索を消しても、そのときのことは遡って開かない（フォルダは閉じたまま。行が隠れているのでフォルダに枠）
     await user.clear(nav().getByLabelText("API を検索"));
-    expect(item(/^video-client\s/)).toHaveAttribute("aria-expanded", "false");
-    expect(ringed()).toEqual([item(/^video-client\s/)]);
+    expect(item(/^video-client(\s|$)/)).toHaveAttribute("aria-expanded", "false");
+    expect(ringed()).toEqual([item(/^video-client(\s|$)/)]);
   });
 
   it("1,000 件の仮想スクロール: 画面の外の行（閉じたフォルダの中）のタブへ切り替えると、フォルダが開いたあとのその行までスクロールを頼む", async () => {
@@ -723,13 +723,13 @@ describe("7. 開いているタブとツリーの連動", () => {
     Object.defineProperty(HTMLElement.prototype, "scrollTo", { configurable: true, writable: true, value: scrollTo });
     try {
       // フォルダを閉じてから、末尾の API のタブへ
-      await user.click(item(/^all\s/));
-      expect(item(/^all\s/)).toHaveAttribute("aria-expanded", "false");
+      await user.click(item(/^all(\s|$)/));
+      expect(item(/^all(\s|$)/)).toHaveAttribute("aria-expanded", "false");
       await user.click(screen.getByRole("tab", { name: /API 1$/ }));
       scrollTo.mockClear();
 
       await user.click(screen.getByRole("tab", { name: /API 1000$/ }));
-      expect(item(/^all\s/)).toHaveAttribute("aria-expanded", "true");
+      expect(item(/^all(\s|$)/)).toHaveAttribute("aria-expanded", "true");
       // 行が増えたあとの位置（1000 行目の近く）へスクロールを頼んでいる。行を全部は描かない
       await waitFor(() => {
         const tops = scrollTo.mock.calls.map((c) => (c[0] as { top: number }).top);
@@ -784,7 +784,7 @@ describe("8. 右クリックメニューを出さない", () => {
       };
       expect(prevented(document.body)).toBe(true);
       expect(prevented(nav().getByLabelText("API を検索"))).toBe(true);
-      expect(prevented(item(/^auth\s/))).toBe(true);
+      expect(prevented(item(/^auth(\s|$)/))).toBe(true);
     } finally {
       off();
     }

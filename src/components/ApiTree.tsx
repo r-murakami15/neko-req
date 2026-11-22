@@ -265,7 +265,6 @@ function TreeRowView({ row, index, meta, tabbable, active, focusRing, onFocusRow
             {row.open ? "▾" : "▸"}
           </span>
           <span className="tree-folder-name">{row.label}</span>
-          <span className="tree-count">{row.count}</span>
         </div>
       );
     case "op": {

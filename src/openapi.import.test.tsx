@@ -131,7 +131,7 @@ describe("取り込みの 3 段階", () => {
     await user.click(footerButton(dialog, "閉じる"));
     // フォルダなし: タグのフォルダ（auth など）は出ず、API がそのまま並ぶ
     expect(await within(sidebar()).findByRole("treeitem", { name: /ログイン状態取得/ })).toBeInTheDocument();
-    expect(within(sidebar()).queryByRole("treeitem", { name: /^auth\s/ })).not.toBeInTheDocument();
+    expect(within(sidebar()).queryByRole("treeitem", { name: /^auth(\s|$)/ })).not.toBeInTheDocument();
   });
 
   it("ファイルを直接アップロード: ダイアログで選ぶ・ドロップで足す・外す。パスが取り込みに渡る", async () => {
@@ -316,7 +316,7 @@ describe("開き方と、既存プロジェクトへの統合", () => {
     expect(await within(dialog).findByText(/件を取り込みました/)).toBeInTheDocument();
     expect(within(dialog).getByText(/追加 1 · 変更 1 · 削除 1/)).toBeInTheDocument();
     await user.click(footerButton(dialog, "閉じる"));
-    expect(await within(sidebar()).findByRole("treeitem", { name: /^video-client\s/ })).toBeInTheDocument();
+    expect(await within(sidebar()).findByRole("treeitem", { name: /^video-client(\s|$)/ })).toBeInTheDocument();
     expect((await mock.operationList(project.id)).some((o) => o.operationId === "getClient")).toBe(true);
   });
 });

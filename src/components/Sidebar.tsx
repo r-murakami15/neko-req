@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 
 import { errorMessage, useBackend } from "../api";
 import { queryKeys, useAdhocList, useOperations, useSourceChanged } from "../api/queries";
@@ -13,6 +13,7 @@ import { useUiStore } from "../store/ui";
 import { ApiTree } from "./ApiTree";
 import { ConfirmDialog } from "./Dialog";
 import { ClockIcon, ListIcon, SearchIcon, SyncIcon } from "./Icons";
+import { useSidebarWidth } from "./SidebarResizer";
 
 /** 左のサイドバー。API ツリー（タグのフォルダ・削除された API・その他）・検索・同期ボタン・環境変数・履歴。 */
 export function Sidebar({ project }: { project: Project }) {
@@ -27,6 +28,7 @@ export function Sidebar({ project }: { project: Project }) {
   const setNewRequestDialogOpen = useUiStore((s) => s.setNewRequestDialogOpen);
   const setSyncDialogOpen = useUiStore((s) => s.setSyncDialogOpen);
   const setScreen = useUiStore((s) => s.setScreen);
+  const { width } = useSidebarWidth();
   const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState<Record<string, boolean | undefined>>({});
   const [deleting, setDeleting] = useState<AdHocRequest | null>(null);
@@ -119,7 +121,7 @@ export function Sidebar({ project }: { project: Project }) {
   const emptyMessage = searching && hits === 0 && !rows.some((r) => r.type === "folder") ? "該当する API がありません。" : null;
 
   return (
-    <nav className="sidebar" aria-label="API ツリー">
+    <nav className="sidebar" aria-label="API ツリー" style={{ "--sidebar-w": `${width}px` } as CSSProperties}>
       <div className="sidebar-search">
         <label className="search-field">
           <SearchIcon />

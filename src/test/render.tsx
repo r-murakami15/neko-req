@@ -31,6 +31,7 @@ export function renderApp(backend: Backend = createMockBackend()) {
     syncDialogOpen: false,
     settingsDialogOpen: false,
     responseOpen: true,
+    sidebarWidth: 280,
     unseenResponses: {},
     focusUrlTabId: null,
   });

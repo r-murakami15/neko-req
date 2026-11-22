@@ -26,6 +26,23 @@ const safeStorage: StateStorage = {
   },
 };
 
+export const SIDEBAR_DEFAULT_WIDTH = 280;
+export const SIDEBAR_MIN_WIDTH = 200;
+export const SIDEBAR_MAX_WIDTH = 600;
+/** サイドバーを広げても、右側（タブ・リクエスト欄）に残す幅。 */
+export const SIDEBAR_RESERVED_WIDTH = 400;
+
+/** サイドバーの幅の上限。最大 600px、かつウィンドウ幅から右側の 400px を引いた幅まで（下限の 200px は割らない）。 */
+export function sidebarMaxWidth(windowWidth: number): number {
+  return Math.max(SIDEBAR_MIN_WIDTH, Math.min(SIDEBAR_MAX_WIDTH, windowWidth - SIDEBAR_RESERVED_WIDTH));
+}
+
+/** サイドバーの幅を、最小〜（ウィンドウ幅に応じた）最大に収める。 */
+export function clampSidebarWidth(width: number, windowWidth: number): number {
+  const n = Number.isFinite(width) ? Math.round(width) : SIDEBAR_DEFAULT_WIDTH;
+  return Math.min(sidebarMaxWidth(windowWidth), Math.max(SIDEBAR_MIN_WIDTH, n));
+}
+
 export type Screen = "main" | "environments" | "history";
 
 interface UiState {
@@ -53,6 +70,9 @@ interface UiState {
   /** レスポンス欄を開いているか（アプリ全体で 1 つ。再起動しても覚える）。 */
   responseOpen: boolean;
   setResponseOpen: (open: boolean) => void;
+  /** サイドバーの幅（px。アプリ全体で 1 つ。再起動しても覚える）。 */
+  sidebarWidth: number;
+  setSidebarWidth: (width: number) => void;
   /** 閉じている間に結果が届いたタブ（開くか、そのタブのレスポンス欄が見えたら外す）。覚えない。 */
   unseenResponses: Record<string, true | undefined>;
   markResponseUnseen: (tabId: string) => void;
@@ -81,6 +101,8 @@ export const useUiStore = create<UiState>()(
       setSyncDialogOpen: (open) => set({ syncDialogOpen: open }),
       responseOpen: true,
       setResponseOpen: (open) => set({ responseOpen: open }),
+      sidebarWidth: SIDEBAR_DEFAULT_WIDTH,
+      setSidebarWidth: (width) => set({ sidebarWidth: Math.round(width) }),
       unseenResponses: {},
       markResponseUnseen: (tabId) => set((s) => ({ unseenResponses: { ...s.unseenResponses, [tabId]: true } })),
       clearResponseUnseen: (tabId) =>
@@ -95,8 +117,8 @@ export const useUiStore = create<UiState>()(
     {
       name: "nekoreq-ui",
       storage: createJSONStorage(() => safeStorage),
-      // 覚えておくのは、開いていたプロジェクトとレスポンス欄の開閉
-      partialize: (state) => ({ currentProjectId: state.currentProjectId, responseOpen: state.responseOpen }),
+      // 覚えておくのは、開いていたプロジェクトとレスポンス欄の開閉、サイドバーの幅
+      partialize: (state) => ({ currentProjectId: state.currentProjectId, responseOpen: state.responseOpen, sidebarWidth: state.sidebarWidth }),
     },
   ),
 );
