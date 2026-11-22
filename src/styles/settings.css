@@ -206,6 +206,9 @@
 .update-banner .update-notes[open] {
   flex: 1 1 100%;
   order: 3;
+  /* 更新内容が長くても、バーが画面を押し上げないように、この中でスクロールする */
+  max-height: 40vh;
+  overflow-y: auto;
 }
 .update-head {
   display: flex;

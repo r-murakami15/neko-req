@@ -32,6 +32,7 @@ export function renderApp(backend: Backend = createMockBackend()) {
     settingsDialogOpen: false,
     responseOpen: true,
     sidebarWidth: 280,
+    responseRatio: 0.5,
     unseenResponses: {},
     focusUrlTabId: null,
   });

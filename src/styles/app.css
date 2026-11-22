@@ -12,6 +12,13 @@ body,
   height: 100%;
 }
 
+/* ページ全体はスクロールさせない（各領域が自分の中でスクロールする）。WebKit のゴムのような伸びも止める */
+html,
+body {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
 body {
   margin: 0;
   background: var(--bg);
@@ -133,12 +140,14 @@ input:disabled {
 
 .welcome {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 100%;
+  height: 100%;
   padding: var(--space-5);
+  /* 画面が低くて収まらないときは、この中でスクロールする（ページ全体は止めている） */
+  overflow-y: auto;
 }
 .welcome-card {
+  /* 中央寄せ。auto の余白なら、はみ出したときに上が切れない */
+  margin: auto;
   width: 100%;
   max-width: 440px;
   padding: var(--space-5);
@@ -199,10 +208,13 @@ input:disabled {
 /* ---- ヘッダー ---- */
 
 .app {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;
   min-height: 0;
+  /* 内側のものがはみ出しても、ページ全体の高さを押し上げない */
+  overflow: hidden;
 }
 
 .app-header {
@@ -346,8 +358,8 @@ input:disabled {
   min-height: 0;
 }
 
-/* サイドバーと右側の境目のつまみ。幅 0 の列の上に、左右へはみ出す 8px の帯を重ねる（.sidebar は overflow: hidden なので外に置く） */
-.sidebar-resizer {
+/* 領域の境目のつまみ（サイドバーと右側・リクエストとレスポンス）。幅 0 の列の上に、左右へはみ出す 8px の帯を重ねる（.sidebar は overflow: hidden なので外に置く） */
+.resizer {
   position: relative;
   z-index: 3;
   flex: 0 0 0;
@@ -356,7 +368,7 @@ input:disabled {
   cursor: col-resize;
   touch-action: none;
 }
-.sidebar-resizer::before {
+.resizer::before {
   content: "";
   position: absolute;
   top: 0;
@@ -366,12 +378,12 @@ input:disabled {
   background: transparent;
   transition: background 0.12s;
 }
-.sidebar-resizer:hover::before,
-.sidebar-resizer:focus-visible::before,
-.sidebar-resizer.is-dragging::before {
+.resizer:hover::before,
+.resizer:focus-visible::before,
+.resizer.is-dragging::before {
   background: color-mix(in srgb, var(--accent) 35%, transparent);
 }
-.sidebar-resizer.is-dragging::before {
+.resizer.is-dragging::before {
   background: color-mix(in srgb, var(--accent) 55%, transparent);
 }
 
@@ -385,6 +397,11 @@ input:disabled {
   border-right: 1px solid var(--border);
   background: var(--bg-panel);
   overflow-y: auto;
+  /* スクロールはできるが、バーは見せない */
+  scrollbar-width: none;
+}
+.sidebar::-webkit-scrollbar {
+  display: none;
 }
 .sidebar-search {
   display: flex;
@@ -513,6 +530,16 @@ input:disabled {
   flex: 1 1 50%;
   flex-direction: column;
   min-width: 0;
+}
+/* リクエストとレスポンスを並べているとき: レスポンスは覚えた割合（--response-ratio）、リクエストは残り全部。どちらも最小幅は残す */
+.panes:not(.is-design):not(.is-response-closed) > .pane {
+  min-width: min(280px, 33.333%);
+}
+.panes:not(.is-design):not(.is-response-closed) > .pane-request {
+  flex: 1 1 0;
+}
+.panes:not(.is-design):not(.is-response-closed) > .pane-response {
+  flex: 0 0 calc(var(--response-ratio, 0.5) * 100%);
 }
 .pane-request {
   border-right: 1px solid var(--border);

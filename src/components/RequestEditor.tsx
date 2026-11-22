@@ -1,5 +1,5 @@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 
 import { errorMessage, useBackend } from "../api";
 import { useEnvironments, useOperationDetail, usePreview, useSaveDraft, useSaveTab } from "../api/queries";
@@ -20,6 +20,7 @@ import { DesignPanel } from "./DesignPanel";
 import { HeadersPanel } from "./HeadersPanel";
 import { ParamsPanel } from "./ParamsPanel";
 import { ResponsePane } from "./ResponsePane";
+import { ResponseResizer, useResponseSplit } from "./ResponseResizer";
 import { VarInput } from "./VarInput";
 
 /** 開いているリクエスト 1 つぶんの画面（URL・送信・リクエストの入力・レスポンス）。 */
@@ -151,6 +152,8 @@ export function RequestEditor({ project, tab }: { project: Project; tab: Request
   // yaml の API の設計タブは、画面イメージのとおり幅いっぱいに読ませる（レスポンス欄は隠す）
   const designFull = op !== null && tab.requestPane === "design";
   const showResponse = responseOpen && !designFull;
+  const panesRef = useRef<HTMLDivElement>(null);
+  const split = useResponseSplit(panesRef);
 
   // レスポンス欄が見えているタブの「新しい結果」の印は外す
   useEffect(() => {
@@ -316,7 +319,11 @@ export function RequestEditor({ project, tab }: { project: Project; tab: Request
         }}
       />
 
-      <div className={`panes${designFull ? " is-design" : ""}${!responseOpen && !designFull ? " is-response-closed" : ""}`}>
+      <div
+        ref={panesRef}
+        className={`panes${designFull ? " is-design" : ""}${!responseOpen && !designFull ? " is-response-closed" : ""}`}
+        style={{ "--response-ratio": split.ratio } as CSSProperties}
+      >
         <section className="pane pane-request" aria-label="リクエスト">
           <div className="pane-tabs" role="tablist" aria-label="リクエスト設定">
             {tabs.map((t) => (
@@ -379,6 +386,7 @@ export function RequestEditor({ project, tab }: { project: Project; tab: Request
           </div>
         </section>
 
+        {showResponse && <ResponseResizer total={split.total} ratio={split.ratio} />}
         {showResponse && <ResponsePane tab={tab} onClose={() => setResponseOpen(false)} />}
       </div>
     </>
