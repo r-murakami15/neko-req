@@ -1,4 +1,5 @@
-import Markdown from "react-markdown";
+import { useMemo } from "react";
+import Markdown, { type Components } from "react-markdown";
 import rehypeSanitize from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
 
@@ -13,32 +14,34 @@ const OPENABLE = /^(https?:|mailto:|tel:)/i;
  */
 export function MarkdownView({ source }: { source: string }) {
   const backend = useBackend();
+  // 描画のたびに新しい部品を渡すと、親が描き直されるたびにリンクや表の要素が作り直される
+  // （押した瞬間に描き直しが入るとクリックが失われ、フォーカスも外れる）。backend が変わらない限り同じものを使う。
+  const components = useMemo<Components>(
+    () => ({
+      a: ({ href, children }) => (
+        <a
+          href={href}
+          title={href}
+          rel="noreferrer noopener"
+          onClick={(e) => {
+            e.preventDefault();
+            if (href && OPENABLE.test(href)) void backend.openExternal(href).catch(() => {});
+          }}
+        >
+          {children}
+        </a>
+      ),
+      table: ({ children }) => (
+        <div className="md-table-wrap">
+          <table>{children}</table>
+        </div>
+      ),
+    }),
+    [backend],
+  );
   return (
     <div className="md">
-      <Markdown
-        remarkPlugins={[remarkGfm]}
-        rehypePlugins={[rehypeSanitize]}
-        components={{
-          a: ({ href, children }) => (
-            <a
-              href={href}
-              title={href}
-              rel="noreferrer noopener"
-              onClick={(e) => {
-                e.preventDefault();
-                if (href && OPENABLE.test(href)) void backend.openExternal(href).catch(() => {});
-              }}
-            >
-              {children}
-            </a>
-          ),
-          table: ({ children }) => (
-            <div className="md-table-wrap">
-              <table>{children}</table>
-            </div>
-          ),
-        }}
-      >
+      <Markdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]} components={components}>
         {source}
       </Markdown>
     </div>

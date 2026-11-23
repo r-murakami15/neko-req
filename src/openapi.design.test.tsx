@@ -1,8 +1,9 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { OpKey, OperationDetail, RequestDraft } from "./bindings";
 import { createMockBackend, type MockBackend } from "./mock/backend";
+import { useTabsStore } from "./store/tabs";
 import { footerButton, openOp, requestRegion, setupWithApi, sidebar } from "./test/openapi";
 
 const key = (id: string): OpKey => ({ kind: "id", value: id });
@@ -139,6 +140,30 @@ describe("設計タブ", () => {
     await user.click(link);
     expect(open).toHaveBeenCalledWith("https://example.com/docs");
     expect((window as unknown as { __pwned?: string }).__pwned).toBeUndefined();
+  });
+
+  it("説明のリンクは、画面が描き直されても同じ要素のまま（押した瞬間の描き直しでクリックが失われない）", async () => {
+    const base = createMockBackend([], { sendDelayMs: 10 });
+    const backend: MockBackend = Object.assign(Object.create(base) as MockBackend, {
+      operationGet: async (projectId: string, opKey: OpKey): Promise<OperationDetail> => ({
+        ...(await base.operationGet(projectId, opKey)),
+        description: "[安全なリンク](https://example.com/docs)",
+      }),
+    });
+    const { user, mock } = await setupWithApi(base, backend);
+    const open = vi.spyOn(mock, "openExternal");
+    const doc = within(await openDesign(user, "auth", /ログイン状態取得/));
+    const link = doc.getByRole("link", { name: "安全なリンク" });
+
+    // 入力とは関係のない更新で、設計タブを描き直させる
+    const tabs = useTabsStore.getState();
+    const tab = tabs.tabs[0];
+    act(() => tabs.setSend(tab.id, (s) => ({ ...s })));
+
+    expect(link.isConnected).toBe(true);
+    expect(doc.getByRole("link", { name: "安全なリンク" })).toBe(link);
+    await user.click(link);
+    expect(open).toHaveBeenCalledWith("https://example.com/docs");
   });
 
   it("「ボディに反映」で、例を送信タブの JSON ボディに入れる", async () => {
