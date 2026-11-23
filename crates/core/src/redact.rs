@@ -11,6 +11,9 @@
 //!   （`\/`・`\"`・`\\`・`\uXXXX`）・base64（標準・URL セーフ、パディングあり・なし）も対象。
 //!   短すぎる値（4 文字未満）からは、前後の空白と base64 の形を作らない（関係のない文字列まで伏せないため）。
 
+use std::collections::HashSet;
+
+use aho_corasick::AhoCorasick;
 use base64::Engine as _;
 use percent_encoding::utf8_percent_encode;
 
@@ -77,14 +80,16 @@ const MIN_DERIVED_CHARS: usize = 4;
 /// 探す文字列（長いものが先）。空・重複は除く。
 fn needles_of(secrets: &[String]) -> Vec<String> {
     let mut needles: Vec<String> = Vec::new();
+    let mut seen: HashSet<String> = HashSet::new();
     for secret in secrets.iter().filter(|s| !s.is_empty()) {
         for variant in secret_variants(secret) {
-            if !needles.contains(&variant) {
+            if seen.insert(variant.clone()) {
                 needles.push(variant);
             }
         }
     }
-    // 長いものから置き換える（短い値が長い値の一部になっていても取り残さない）
+    // 長いものから置き換える（短い値が長い値の一部になっていても取り残さない）。
+    // 安定ソートなので、同じ長さの順序は挿入順のまま
     needles.sort_by_key(|n| std::cmp::Reverse(n.len()));
     needles
 }
@@ -92,13 +97,47 @@ fn needles_of(secrets: &[String]) -> Vec<String> {
 /// `text` の中のシークレットの値をすべて `••••` にする。空の値は無視する。
 pub fn redact_text(text: &str, secrets: &[String]) -> String {
     let needles = needles_of(secrets);
+    if needles.is_empty() {
+        return text.to_string();
+    }
+    // 探す文字列は数千件になるので、1 件ずつ全体を走査せず、先に元のテキストを 1 回だけ走査して
+    // 現れる文字列だけに絞る（重なる出現も拾う）。`•`（MASK の文字）を含まない文字列は、置き換えで
+    // 新しく現れることがない（置き換え後のテキストのうち MASK 以外の部分は元のテキストの部分文字列で、
+    // MASK をまたがない出現は元のテキストにもあったため）ので、元のテキストに無ければ捨ててよい。
+    // `•` を含む文字列は、置き換えのあとで新しく現れうるので、常に残す。
+    let present = present_needles(text, &needles);
     let mut out = text.to_string();
-    for needle in &needles {
-        if out.contains(needle.as_str()) {
+    for (needle, keep) in needles.iter().zip(&present) {
+        if *keep && out.contains(needle.as_str()) {
             out = out.replace(needle.as_str(), MASK);
         }
     }
     out
+}
+
+/// 各 needle を残すか。元のテキストに現れるもの、または MASK の文字を含むもの（理由は `redact_text`）。
+fn present_needles(text: &str, needles: &[String]) -> Vec<bool> {
+    let mask_char = MASK.chars().next().unwrap_or('•');
+    let mut keep: Vec<bool> = needles.iter().map(|n| n.contains(mask_char)).collect();
+    // 構築に失敗したら（巨大すぎるなど）絞り込みをやめて全部残す。結果は変わらず、遅くなるだけ
+    let Ok(ac) = AhoCorasick::new(needles) else {
+        return vec![true; needles.len()];
+    };
+    let mut remaining = keep.iter().filter(|k| !**k).count();
+    if remaining == 0 {
+        return keep;
+    }
+    for m in ac.find_overlapping_iter(text) {
+        let i = m.pattern().as_usize();
+        if !keep[i] {
+            keep[i] = true;
+            remaining -= 1;
+            if remaining == 0 {
+                break;
+            }
+        }
+    }
+    keep
 }
 
 /// 途中で切れたテキスト（表示上限で切ったもの）の末尾に、シークレットの先頭の断片が残らないようにする。

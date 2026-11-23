@@ -27,6 +27,7 @@ nekoreq-secrets = { path = "crates/secrets" }
 nekoreq-curl = { path = "crates/curl" }
 
 # 共通
+aho-corasick = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order", "unbounded_depth"] }
 # 深く入れ子になった JSON を再帰で落ちずに読む（保存した Operation のスキーマ）
