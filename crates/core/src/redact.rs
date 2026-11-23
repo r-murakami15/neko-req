@@ -13,7 +13,7 @@
 
 use std::collections::HashSet;
 
-use aho_corasick::AhoCorasick;
+use aho_corasick::{AhoCorasick, AhoCorasickKind};
 use base64::Engine as _;
 use percent_encoding::utf8_percent_encode;
 
@@ -120,7 +120,12 @@ fn present_needles(text: &str, needles: &[String]) -> Vec<bool> {
     let mask_char = MASK.chars().next().unwrap_or('•');
     let mut keep: Vec<bool> = needles.iter().map(|n| n.contains(mask_char)).collect();
     // 構築に失敗したら（巨大すぎるなど）絞り込みをやめて全部残す。結果は変わらず、遅くなるだけ
-    let Ok(ac) = AhoCorasick::new(needles) else {
+    // 種類を NFA に固定する。探す文字列が少ないと自動で DFA が選ばれ、組み立てが文字列の長さのほぼ 2 乗
+    // かかる（8000 文字のシークレットで数分）。NFA なら長い文字列でも組み立てが軽く、探す速さも十分
+    let Ok(ac) = AhoCorasick::builder()
+        .kind(Some(AhoCorasickKind::ContiguousNFA))
+        .build(needles)
+    else {
         return vec![true; needles.len()];
     };
     let mut remaining = keep.iter().filter(|k| !**k).count();

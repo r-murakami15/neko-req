@@ -453,6 +453,25 @@ fn many_secrets_on_a_large_text_finish_quickly() {
     );
 }
 
+#[test]
+fn a_very_long_secret_does_not_make_redaction_slow() {
+    // 探す文字列が少ないと DFA が選ばれ、長いシークレットで組み立てが 2 乗に遅くなっていた（再発防止）
+    let secret = "L".repeat(8000);
+    let secrets = vec![secret.clone()];
+    let json = format!(r#"{{"token":"{secret}","n":1}}"#);
+    let start = std::time::Instant::now();
+    let out_json = redact_text(&json, &secrets);
+    let out_short = redact_text("short text without it, LLL", &secrets);
+    assert!(!out_json.contains(&secret));
+    assert_eq!(out_json, format!(r#"{{"token":"{MASK}","n":1}}"#));
+    assert_eq!(out_short, "short text without it, LLL");
+    assert!(
+        start.elapsed() < std::time::Duration::from_secs(2),
+        "{:?}",
+        start.elapsed()
+    );
+}
+
 // ---- ヘッダー名の伏せ字 ----
 
 #[test]
